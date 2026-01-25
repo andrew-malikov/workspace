@@ -4,9 +4,9 @@ No hassle DX to manage dozen of microservices at work.
 
 - [WS](#ws)
   - [Project Tracking](#project-tracking)
-  - [Run tests](#run-tests)
+  - [Run Tests](#run-tests)
   - [Git Cleanup](#git-cleanup)
-  - [Worktrees and DB migrations](#worktrees-and-db-migrations)
+  - [Worktrees and DB Migrations](#worktrees-and-db-migrations)
   - [Development](#development)
 
 ## Project Tracking
@@ -31,7 +31,7 @@ Remove already tracked directory from the tracker:
 ws untrack <directory>
 ```
 
-## Run tests
+## Run Tests
 
 There are three types of tests
 
@@ -47,7 +47,7 @@ OR you can use this one:
 ws tests [-a alias]
 ```
 
-it would check whether any other composes are up (across you add to the tracker) and down them.
+It would check whether any other composes are up (across tracked ones) and down them.
 
 ## Git Cleanup
 
@@ -71,9 +71,9 @@ ws git cleanup
 
 The good part it spit out when the last commit was made and who's the author, which makes easier to communicate whether the branch is indeed stale.
 
-## Worktrees and DB migrations
+## Worktrees and DB Migrations
 
-Worktree support isn't in the current roadmap BUT I definitely would work on it as it would allow tracking mismatched DB migrations. Basically migrations get messed up when several people work on the same mircoservice and have their own new migrations, the apply order guaranteed only by `who deploys first`. The idea is to check across all the branches that the order are preserved against the current work branch.
+Worktree support isn't in the current roadmap BUT I definitely would work on it as it would allow tracking mismatched DB migrations. Basically migrations get messed up when several people work on the same mircoservice and have their own new migrations, the apply order guaranteed only by `who deploys first`. The idea is to check across all the branches that the order is preserved against the current work branch.
 
 ## Development
 
