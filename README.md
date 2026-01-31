@@ -19,7 +19,7 @@ Add a new directory with a microservice into the tracker:
 ws track <directory> [-a alias]
 ```
 
-or simply track the current one:
+Or simply track the current one:
 
 ```bash
 ws track
@@ -39,7 +39,7 @@ There are three types of tests
 - integration
 - component
 
-Unit tests doesn't require any prior setup while the last two requires to up docker compose. Usually it's no big deal BUT gotcha bangs you quick when you try to up several composes, ports are the same so running it all up doesn't work out. So what you do is dancing with previous composes you touched.
+Unit tests doesn't require any prior setup while the last two do require to up docker compose. Usually it's no big deal BUT gotcha bangs you quick when you try to up several composes, ports are the same (of some services unfortunately) so running it all doesn't work out. So what you do is dancing with previous composes you touched.
 
 OR you can use this one:
 
@@ -47,7 +47,7 @@ OR you can use this one:
 ws tests [-a alias]
 ```
 
-It would check whether any other composes are up (across tracked ones) and down them.
+It would check whether any other compose is up (across tracked ones) and down it.
 
 ## Git Cleanup
 
