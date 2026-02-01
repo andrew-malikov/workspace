@@ -3,11 +3,28 @@
 No hassle DX to manage dozen of microservices at work.
 
 - [WS](#ws)
+  - [Install](#install)
   - [Project Tracking](#project-tracking)
   - [Run Tests](#run-tests)
   - [Git Cleanup](#git-cleanup)
   - [Worktrees and DB Migrations](#worktrees-and-db-migrations)
   - [Development](#development)
+
+## Install
+
+Homebrew:
+
+```sh
+smth on elvish
+```
+
+Go way:
+
+```sh
+smth on fishlang
+```
+
+i.e. not ready yet.
 
 ## Project Tracking
 
@@ -16,19 +33,13 @@ First thing to do is to set up the microservice you intend to run locally or to 
 Add a new directory with a microservice into the tracker:
 
 ```bash
-ws track <directory> [-a alias]
-```
-
-Or simply track the current one:
-
-```bash
-ws track
+ws track <alias> [directory]
 ```
 
 Remove already tracked directory from the tracker:
 
 ```bash
-ws untrack <directory>
+ws untrack <directory | alias>
 ```
 
 ## Run Tests
@@ -39,7 +50,7 @@ There are three types of tests
 - integration
 - component
 
-Unit tests doesn't require any prior setup while the last two do require to up docker compose. Usually it's no big deal BUT gotcha bangs you quick when you try to up several composes, ports are the same (of some services unfortunately) so running it all doesn't work out. So what you do is dancing with previous composes you touched.
+Unit tests don't require any prior setup in opposite to the rest that do require to up docker compose. Usually it's no big deal BUT gotcha bangs you quick when you try to up several composes, ports are the same (of some services unfortunately) so running it all doesn't work out. So what you do is dancing with previous composes you touched.
 
 OR you can use this one:
 
@@ -77,16 +88,20 @@ Worktree support isn't in the current roadmap BUT I definitely would work on it 
 
 ## Development
 
-To install dependencies:
+Build:
 
-```bash
-bun install
+```sh
+mise build
 ```
 
-To run:
+Run:
 
-```bash
-bun run index.ts
+```sh
+./binaries/ws
 ```
 
-This project was created using `bun init` in bun v1.2.15. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+Debug:
+
+```sh
+dlv exec binaries/ws
+```
