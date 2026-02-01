@@ -27,11 +27,6 @@ type AddProjectResult struct {
 }
 
 func (config *Config) AddProject(project projects.Project) (*AddProjectResult, error) {
-	err := project.EnsureValidDir()
-	if err != nil {
-		return nil, err
-	}
-
 	for _, existingProject := range config.Projects {
 		if existingProject.Alias == project.Alias {
 			return nil, fmt.Errorf("a project with such alias %s already exist at %s", project.Alias, existingProject.Dir)

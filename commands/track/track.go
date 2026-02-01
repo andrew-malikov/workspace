@@ -45,7 +45,7 @@ func NewCommand() *cli.Command {
 			},
 			&cli.StringArg{
 				Name:      "dir",
-				Value:     ".",
+				Value:     "",
 				UsageText: "tracking directory",
 			},
 		},
@@ -70,22 +70,24 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			// todo: define a draft project to convert into a valid project
-			// so the path validation happens before the config loading
+			draft := projects.DraftProject{
+				Alias:      input.alias,
+				Dir:        &input.dir,
+				Compose:    &input.compose,
+				Migrations: &input.migrations,
+			}
+
+			project, err := draft.ToProject()
+			if err != nil {
+				return err
+			}
 
 			config, err := cfg.LoadConfig()
 			if err != nil {
 				return err
 			}
 
-			project := projects.Project{
-				Alias:      input.alias,
-				Dir:        input.dir,
-				Compose:    &input.compose,
-				Migrations: &input.migrations,
-			}
-
-			result, err := config.AddProject(project)
+			result, err := config.AddProject(*project)
 			if err != nil {
 				return err
 			}
@@ -94,6 +96,8 @@ func NewCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
+
+			// todo: a template needed or something UIish
 
 			fmt.Printf("Project %s has been successfully added to the tracker at %s", project.Alias, project.Dir)
 			fmt.Printf("Compose found at %s : %v", *project.Compose, result.DoesComposeExist)

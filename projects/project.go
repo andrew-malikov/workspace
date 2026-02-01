@@ -1,8 +1,6 @@
 package projects
 
 import (
-	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -12,19 +10,6 @@ type Project struct {
 	Dir        string
 	Compose    *string
 	Migrations *string
-}
-
-func (project Project) EnsureValidDir() error {
-	info, err := os.Stat(project.Dir)
-	if err != nil {
-		return errors.Join(fmt.Errorf("Could not find the directory: %s", project.Dir), err)
-	}
-
-	if !info.IsDir() {
-		return fmt.Errorf("Found file instead of directory at: %s", project.Dir)
-	}
-
-	return nil
 }
 
 func (project Project) DoesComposeExist() bool {
