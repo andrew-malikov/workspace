@@ -1,13 +1,16 @@
 package track
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
+	"text/template"
 	cfg "ws/config"
 	"ws/projects"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/urfave/cli/v3"
 )
 
@@ -97,13 +100,37 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			// todo: a template needed or something UIish
-
-			fmt.Printf("Project %s has been successfully added to the tracker at %s", project.Alias, project.Dir)
-			fmt.Printf("Compose found at %s : %v", *project.Compose, result.DoesComposeExist)
-			fmt.Printf("Migrations found at %s : %v", *project.Migrations, result.DoesComposeExist)
-
-			return nil
+			return output(*project, *result)
 		},
 	}
+}
+
+var TEMPLATE = template.Must(template.New("track_result").Parse(
+	`Project *{{.Alias}}* is tracked under **{{.Dir}}**
+
+* [{{if .HasCompose}}x{{else}} {{end}}] compose
+* [{{if .HasMigrations}}x{{else}} {{end}}] migrations`,
+))
+
+func output(project projects.Project, result cfg.AddProjectResult) error {
+	return render(TEMPLATE, map[string]any{
+		"Alias":         project.Alias,
+		"Dir":           project.Dir,
+		"HasCompose":    result.DoesComposeExist,
+		"HasMigrations": result.DoMigrationsExist,
+	})
+}
+
+// todo: move out into a view package
+func render(tmpl *template.Template, data map[string]any) error {
+	var buf bytes.Buffer
+	tmpl.Execute(&buf, data)
+
+	out, err := glamour.Render(buf.String(), "dark")
+	if err != nil {
+		return err
+	}
+
+	fmt.Print(out)
+	return nil
 }
