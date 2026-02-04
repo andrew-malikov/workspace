@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	flr "ws/failure"
 	projects "ws/projects"
 
 	"github.com/BurntSushi/toml"
@@ -58,6 +59,36 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 	}
 
 	return &result, nil
+}
+
+type NoProjectFound struct {
+	Alsdir string
+}
+
+func (config *Config) RemoveProject(alsdir string) (*projects.Project, *flr.Failure) {
+	var foundProject *projects.Project
+	for _, project := range config.Projects {
+		if project.Alias == alsdir || strings.HasPrefix(alsdir, project.Dir) {
+			foundProject = &project
+			break
+		}
+	}
+
+	if foundProject == nil {
+		return nil, flr.OfCtx(
+			flr.Context{
+				// todo: definitely MUST be a constant
+				Type: "NO_PROJECT_FOUND",
+				Details: &NoProjectFound{
+					Alsdir: alsdir,
+				},
+			},
+		)
+	}
+
+	delete(config.Projects, foundProject.Alias)
+
+	return foundProject, nil
 }
 
 const DEFAULT_UNIX_CONFIG_DIR = ".config"

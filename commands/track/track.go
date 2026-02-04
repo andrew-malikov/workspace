@@ -1,16 +1,14 @@
 package track
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"text/template"
 	cfg "ws/config"
 	"ws/projects"
+	"ws/view"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/urfave/cli/v3"
 )
 
@@ -39,8 +37,9 @@ func (input input) Validate() error {
 
 func NewCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "track",
-		Usage: "start tracking directory",
+		Name:    "track",
+		Aliases: []string{"add", "tr"},
+		Usage:   "start tracking directory as a project",
 		Arguments: []cli.Argument{
 			&cli.StringArg{
 				Name:      "alias",
@@ -100,37 +99,19 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			return output(*project, *result)
+			return view.Render(RESULT_TEMPLATE, view.Args{
+				"Alias":         project.Alias,
+				"Dir":           project.Dir,
+				"HasCompose":    result.DoesComposeExist,
+				"HasMigrations": result.DoMigrationsExist,
+			})
 		},
 	}
 }
 
-var TEMPLATE = template.Must(template.New("track_result").Parse(
+var RESULT_TEMPLATE = template.Must(template.New("track_result").Parse(
 	`Project *{{.Alias}}* is tracked under **{{.Dir}}**
 
 * [{{if .HasCompose}}x{{else}} {{end}}] compose
 * [{{if .HasMigrations}}x{{else}} {{end}}] migrations`,
 ))
-
-func output(project projects.Project, result cfg.AddProjectResult) error {
-	return render(TEMPLATE, map[string]any{
-		"Alias":         project.Alias,
-		"Dir":           project.Dir,
-		"HasCompose":    result.DoesComposeExist,
-		"HasMigrations": result.DoMigrationsExist,
-	})
-}
-
-// todo: move out into a view package
-func render(tmpl *template.Template, data map[string]any) error {
-	var buf bytes.Buffer
-	tmpl.Execute(&buf, data)
-
-	out, err := glamour.Render(buf.String(), "dark")
-	if err != nil {
-		return err
-	}
-
-	fmt.Print(out)
-	return nil
-}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"ws/commands/track"
+	"ws/commands/untrack"
 
 	"github.com/urfave/cli/v3"
 )
@@ -14,6 +15,7 @@ func main() {
 		Usage: "workspace you way out",
 		Commands: []*cli.Command{
 			track.NewCommand(),
+			untrack.NewCommand(),
 		},
 	}
 

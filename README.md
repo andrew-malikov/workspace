@@ -21,7 +21,7 @@ smth on elvish
 Go way:
 
 ```sh
-smth on fishlang
+smth on fishish
 ```
 
 i.e. not ready yet.
@@ -39,7 +39,7 @@ ws track <alias> [directory]
 Remove already tracked directory from the tracker:
 
 ```bash
-ws untrack <directory | alias>
+ws untrack [directory | alias]
 ```
 
 ## Run Tests
