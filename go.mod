@@ -1,4 +1,4 @@
-module ws
+module github.com/andrew-malikov/workspace
 
 go 1.25.5
 
