@@ -4,8 +4,9 @@ import (
 	"context"
 	"os"
 	"text/template"
-	cfg "ws/config"
-	"ws/view"
+
+	cfg "github.com/andrew-malikov/workspace/config"
+	"github.com/andrew-malikov/workspace/view"
 
 	"github.com/urfave/cli/v3"
 )

@@ -1,7 +1,7 @@
 package git
 
 import (
-	"ws/commands/git/clear"
+	"github.com/andrew-malikov/workspace/commands/git/clear"
 
 	"github.com/urfave/cli/v3"
 )

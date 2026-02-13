@@ -5,9 +5,10 @@ import (
 	"os"
 	"strings"
 	"text/template"
-	cfg "ws/config"
-	flr "ws/failure"
-	"ws/view"
+
+	cfg "github.com/andrew-malikov/workspace/config"
+	flr "github.com/andrew-malikov/workspace/failure"
+	"github.com/andrew-malikov/workspace/view"
 
 	"github.com/urfave/cli/v3"
 )
@@ -28,7 +29,7 @@ func NewCommand() *cli.Command {
 				Name:    "all",
 				Aliases: []string{"a"},
 				Value:   false,
-				Usage:   "allows to remove all the matches projects",
+				Usage:   "allogithub.com/andrew-malikov/workspace to remove all the matches projects",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {

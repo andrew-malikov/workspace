@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	flr "ws/failure"
-	projects "ws/projects"
+
+	flr "github.com/andrew-malikov/workspace/failure"
+	projects "github.com/andrew-malikov/workspace/projects"
 
 	"github.com/BurntSushi/toml"
 )

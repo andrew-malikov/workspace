@@ -4,7 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	"ws/vcs"
+
+	"github.com/andrew-malikov/workspace/vcs"
 )
 
 type Project struct {

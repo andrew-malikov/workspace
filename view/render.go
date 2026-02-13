@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
-	flr "ws/failure"
+
+	flr "github.com/andrew-malikov/workspace/failure"
 
 	"github.com/charmbracelet/glamour"
 )

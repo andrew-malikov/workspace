@@ -5,9 +5,10 @@ import (
 	"errors"
 	"strings"
 	"text/template"
-	cfg "ws/config"
-	"ws/projects"
-	"ws/view"
+
+	cfg "github.com/andrew-malikov/workspace/config"
+	"github.com/andrew-malikov/workspace/projects"
+	"github.com/andrew-malikov/workspace/view"
 
 	"github.com/urfave/cli/v3"
 )
