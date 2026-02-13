@@ -26,7 +26,7 @@ func NewCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "all",
-				Aliases: []string{"-a"},
+				Aliases: []string{"a"},
 				Value:   false,
 				Usage:   "allows to remove all the matches projects",
 			},

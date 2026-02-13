@@ -3,6 +3,8 @@ package projects
 import (
 	"os"
 	"path/filepath"
+	"time"
+	"ws/vcs"
 )
 
 type Project struct {
@@ -52,4 +54,37 @@ func (project *Project) ResetCompose() {
 
 func (project *Project) ResetMigrations() {
 	project.Migrations = nil
+}
+
+type StaleBranch struct {
+	IsStale bool
+	vcs.Branch
+}
+
+var STALE_INTERVAL = time.Hour * 24 * 14
+
+func (project Project) ListStaleBranches() ([]StaleBranch, error) {
+	git, err := vcs.NewProjectGit(project.Dir)
+	if err != nil {
+		return nil, err
+	}
+
+	branches, err := git.ListBranches()
+	if err != nil {
+		return nil, err
+	}
+
+	staleBranches := make([]StaleBranch, len(branches))
+	for index := range branches {
+		isStale := false
+		if inactive := time.Now().Sub(branches[index].UpdatedAt); inactive > STALE_INTERVAL {
+			isStale = true
+		}
+		staleBranches[index] = StaleBranch{
+			IsStale: isStale,
+			Branch:  branches[index],
+		}
+	}
+
+	return staleBranches, nil
 }

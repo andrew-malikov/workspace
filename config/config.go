@@ -22,6 +22,16 @@ func emptyConfig() Config {
 	}
 }
 
+func (config Config) ResolveProjectByDir(dir string) *projects.Project {
+	for _, project := range config.Projects {
+		if strings.HasPrefix(project.Dir, dir) {
+			return &project
+		}
+	}
+
+	return nil
+}
+
 type AddProjectResult struct {
 	DoesComposeExist  bool
 	DoMigrationsExist bool

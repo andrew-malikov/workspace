@@ -34,3 +34,13 @@ func RenderUnhandledFailure(ctx flr.Context) error {
 		"Type": ctx.Type,
 	})
 }
+
+var DIRECTORY_IS_NOT_TRACKED_YET = template.Must(template.New("directory_is_untracked").Parse(
+	`Current directory **{{.Dir}}** isn't tracked yet`,
+))
+
+func RenderDirectoryIsNotTrackedYet(dir string) error {
+	return Render(DIRECTORY_IS_NOT_TRACKED_YET, Args{
+		"Dir": dir,
+	})
+}

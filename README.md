@@ -68,10 +68,28 @@ Lots of people make lots of code and thus lots of stale branches (me too by the 
 ws git cleanup --dry-run
 ```
 
+```md
+| [ ] | branch           | author | updated at          | status |
+| --- | ---------------- | ------ | ------------------- | ------ |
+| [ ] | feat/glancy-list | you    | 2026-08-02 11:30 AM | synced |
+| [x] | feat/remove-me   | you    | 2026-02-01 14:15 PM | local  |
+| ... | ...              | ...    | ...                 | ...    |
+| [x] | story/mocks      | you    | 2024-31-12 23:59 PM | remote |
+```
+
 You can count your teammates:
 
 ```bash
 ws git cleanup --dry-run --team
+```
+
+```md
+| [ ] | branch           | author       | updated at          | status |
+| --- | ---------------- | ------------ | ------------------- | ------ |
+| [ ] | feat/glancy-list | you          | 2026-08-02 11:30 AM | synced |
+| [x] | feat/remove-me   | you          | 2026-02-01 14:15 PM | local  |
+| ... | ...              | ...          | ...                 | ...    |
+| [x] | hotfix/your-pc   | mr. anderson | 2021-01-01 00:00 AM | local  |
 ```
 
 Running without `--dry` forces the show up plan first for you to review and then if you're okay execute:

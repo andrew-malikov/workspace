@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"ws/commands/git"
 	"ws/commands/track"
 	"ws/commands/untrack"
 
@@ -16,6 +17,7 @@ func main() {
 		Commands: []*cli.Command{
 			track.NewCommand(),
 			untrack.NewCommand(),
+			git.NewCommand(),
 		},
 	}
 
