@@ -13,6 +13,7 @@ import (
 
 func main() {
 	commands := &cli.Command{
+		Name:  "ws",
 		Usage: "workspace you way out",
 		Commands: []*cli.Command{
 			track.NewCommand(),

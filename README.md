@@ -21,7 +21,7 @@ smth on elvish
 Go way:
 
 ```sh
-smth on fishish
+go install github.com/andrew-malikov/workspace@latest
 ```
 
 i.e. not ready yet.
