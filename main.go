@@ -14,7 +14,7 @@ import (
 
 func main() {
 	commands := &cli.Command{
-		Name:  "github.com/andrew-malikov/workspace",
+		Name:  "ws",
 		Usage: "workspace you way out",
 		Commands: []*cli.Command{
 			track.NewCommand(),
