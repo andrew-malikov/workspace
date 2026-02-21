@@ -14,7 +14,7 @@ else
     next=$((last + 1))
 fi
 
-new_tag="${today}.${next}"
+new_tag="${today}-${next}"
 
 echo "Appending tag: $new_tag"
 git tag "$new_tag"

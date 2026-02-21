@@ -133,4 +133,4 @@ Use the command:
 mise tag
 ```
 
-It checks the latest tag and appends a new one in format `yyyy.mm.dd.number`.
+It checks the latest tag and appends a new one in format `yyyy.mm.dd-n` where `n` is an incrementing build number per a day.
