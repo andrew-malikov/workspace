@@ -9,6 +9,7 @@ No hassle DX to manage dozen of microservices at work.
   - [Git Cleanup](#git-cleanup)
   - [Worktrees and DB Migrations](#worktrees-and-db-migrations)
   - [Development](#development)
+  - [Versioning](#versioning)
 
 ## Install
 
@@ -123,3 +124,13 @@ Debug:
 ```sh
 dlv exec binaries/ws
 ```
+
+## Versioning
+
+Use the command:
+
+```sh
+mise tag
+```
+
+It checks the latest tag and appends a new one in format `yyyy.mm.dd.number`.

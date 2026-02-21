@@ -1,0 +1,54 @@
+version: 2
+
+project_name: ws
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: ws
+    main: ./
+    binary: ws
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    builds:
+      - ws
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{ .Version }}_
+      {{ .Os }}_
+      {{ .Arch }}
+
+homebrew-casks:
+  - name: ws
+    homepage: "https://github.com/andrew-malikov/ws"
+    description: "Workspace everything"
+    license: "MIT"
+
+    directory: Casks
+
+    repository:
+      owner: andrew-malikov
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+
+    commit_author:
+      name: goreleaser
+      email: actions@github.com
+
+    hooks:
+    post:
+      install: |
+        if OS.mac?
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ws"]
+        end
