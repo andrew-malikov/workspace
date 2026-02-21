@@ -19,16 +19,16 @@ builds:
 
 archives:
   - id: default
-    builds:
+    ids:
       - ws
-    format: tar.gz
+    formats: ["tar.gz"]
     name_template: >-
       {{ .ProjectName }}_
       {{ .Version }}_
       {{ .Os }}_
       {{ .Arch }}
 
-homebrew-casks:
+homebrew_casks:
   - name: ws
     homepage: "https://github.com/andrew-malikov/ws"
     description: "Workspace everything"
@@ -47,8 +47,8 @@ homebrew-casks:
       email: actions@github.com
 
     hooks:
-    post:
-      install: |
-        if OS.mac?
-          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ws"]
-        end
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/ws"]
+          end
