@@ -16,16 +16,9 @@ No hassle DX to manage dozen of microservices at work.
 Homebrew:
 
 ```sh
-smth on elvish
+brew tap andrew-malikov/tap
+brew install --cask andrew-malikov/tap/ws
 ```
-
-Go way:
-
-```sh
-go install github.com/andrew-malikov/workspace@latest
-```
-
-i.e. not ready yet.
 
 ## Project Tracking
 
