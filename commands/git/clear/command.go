@@ -21,6 +21,7 @@ func NewCommand() *cli.Command {
 		Name:    "clear",
 		Aliases: []string{"clr", "c"},
 		Usage:   "clear hanging branches",
+		// todo: probably outdated by tui
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "dry-run",
@@ -53,7 +54,7 @@ func NewCommand() *cli.Command {
 				return view.RenderDirectoryIsNotTrackedYet(dir)
 			}
 
-			branches, err := project.ListStaleBranches()
+			branches, err := project.ListStaleBranches(false)
 			if err != nil {
 				return err
 			}

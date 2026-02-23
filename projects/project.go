@@ -64,10 +64,17 @@ type StaleBranch struct {
 
 var STALE_INTERVAL = time.Hour * 24 * 14
 
-func (project Project) ListStaleBranches() ([]StaleBranch, error) {
+// todo: define list options instead of bunch of args
+func (project Project) ListStaleBranches(fetch bool) ([]StaleBranch, error) {
 	git, err := vcs.NewProjectGit(project.Dir)
 	if err != nil {
 		return nil, err
+	}
+
+	if fetch {
+		if err := git.Fetch(); err != nil {
+			return nil, err
+		}
 	}
 
 	branches, err := git.ListBranches()

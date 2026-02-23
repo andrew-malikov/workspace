@@ -33,19 +33,52 @@ type Branch struct {
 	Status    string
 }
 
+func (projectGit *ProjectGit) Fetch() error {
+	return projectGit.repository.Fetch(&git.FetchOptions{Prune: true})
+}
+
 func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 	user := projectGit.ResolveUser()
 
-	refs, err := projectGit.repository.Branches()
+	// types of branches
+	// 1. local only
+	// 2. remote only
+	// 3. local is synced to remote
+	// 4. local is latest, remote is out of sync
+	// 5. remote is latest, local is out of sync
+	// 6. local is diverged from remote
+
+	branches, err := projectGit.repository.Branches()
+	if err != nil {
+		return nil, err
+	}
+
+	// todo: surely list all the remotes and get through all of them
+	//       though this way shoots out 99.9% cases
+	remote, err := projectGit.repository.Remote("origin")
+	if err != nil {
+		return nil, err
+	}
+
+	originRefs, err := remote.List(&git.ListOptions{
+		PeelingOption: git.AppendPeeled,
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	result := make([]Branch, 0)
-	err = refs.ForEach(func(ref *plumbing.Reference) error {
+	err = branches.ForEach(func(ref *plumbing.Reference) error {
 		status := "local"
-		if branch, _ := projectGit.repository.Branch(ref.Name().Short()); branch != nil && branch.Remote != "" {
-			status = "synced"
+		for _, originRef := range originRefs {
+			if !originRef.Name().IsBranch() {
+				continue
+			}
+			// todo: check the actual upstream for the branch instead of guessing through equality
+			if originRef.Name().Short() == ref.Name().Short() {
+				status = "synced"
+				break
+			}
 		}
 
 		commit, err := projectGit.repository.CommitObject(ref.Hash())
@@ -58,6 +91,7 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			author = "you"
 		}
 
+		// todo: keeping the remote name is 100% important
 		result = append(result, Branch{
 			Name:      ref.Name().Short(),
 			Author:    author,
