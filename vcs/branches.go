@@ -83,6 +83,8 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 	seenRemoteKeys := make(map[string]struct{})
 
 	for localName, localRef := range localByName {
+		// todo: don't hardcode origin, grab the proper remote name
+		// 		 what to do if there several ones? find the first that has it
 		remoteKey := "origin/" + localName
 		remoteRef, hasRemote := remoteByName[remoteKey]
 
@@ -106,9 +108,13 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			related = &RelatedBranch{
 				Name:      remoteRef.name,
 				UpdatedAt: time.Now(),
-				Author:    "",
-				Remote:    &remoteRef.remote,
-				Status:    status,
+				// todo: surely showing up who's author is must have
+				// 	     it's okay to use latest commit
+				// 	     BUT there should be a better strategy
+				// 		 check the median comment's author, first and the last
+				Author: "",
+				Remote: &remoteRef.remote,
+				Status: status,
 			}
 			seenRemoteKeys[remoteKey] = struct{}{}
 		}
