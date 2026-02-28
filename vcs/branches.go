@@ -8,29 +8,50 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 )
 
-type ProjectGit struct {
-	dir        string
-	repository *git.Repository
-}
+type BranchStatus = int
 
-func NewProjectGit(dir string) (*ProjectGit, error) {
-	repository, err := git.PlainOpen(dir)
-	if err != nil {
-		return nil, err
-	}
-	return &ProjectGit{
-		repository: repository,
-		dir:        dir,
-	}, nil
-}
+const (
+	SyncedBranch BranchStatus = iota
+	AheadBranch
+	BehindBranch
+	DivergedBranch
+)
 
-const MASTER_BRANCH = "main"
-
+// Types of branches
+//
+//  1. local only
+//
+//     has no Remote and Related
+//
+//  2. remote only
+//
+//     has Remote and no Related
+//
+//  3. local with remote
+//
+//     has Related and no Remote and Related has Remote
 type Branch struct {
 	Name      string
 	UpdatedAt time.Time
 	Author    string
-	Status    string
+	Remote    *string
+	// todo: sure there may be many remotes
+	// 		 it looks like branches are grouped by some kind of ref
+	// 	     so that even different refs can be accostomed via different upstreams
+	// 		 which gives a net of whatever that is grouped by whatever but that's not
+	// 		 the problem to deal with here, in most scenarios there's one remote only,
+	// 		 and most of the branches either behind, ahead or synced, the diverged one
+	// 		 is a broken one, people usually try to resolve, but hanging branches alike
+	// 		 might still exist, because people are still messy mess that digress
+	Related *RelatedBranch
+}
+
+type RelatedBranch struct {
+	Name      string
+	UpdatedAt time.Time
+	Author    string
+	Remote    *string
+	Status    BranchStatus
 }
 
 func (projectGit *ProjectGit) Fetch() error {
@@ -40,50 +61,61 @@ func (projectGit *ProjectGit) Fetch() error {
 func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 	user := projectGit.ResolveUser()
 
-	// types of branches
-	// 1. local only
-	// 2. remote only
-	// 3. local is synced to remote
-	// 4. local is latest, remote is out of sync
-	// 5. remote is latest, local is out of sync
-	// 6. local is diverged from remote
-
-	branches, err := projectGit.repository.Branches()
+	local, err := projectGit.getLocalBranches()
 	if err != nil {
 		return nil, err
 	}
+	localByName := make(map[string]branchRef)
+	for _, branch := range local {
+		localByName[branch.name] = branch
+	}
 
-	// todo: surely list all the remotes and get through all of them
-	//       though this way shoots out 99.9% cases
-	remote, err := projectGit.repository.Remote("origin")
+	remote, err := projectGit.getRemoteBranches()
 	if err != nil {
 		return nil, err
 	}
-
-	originRefs, err := remote.List(&git.ListOptions{
-		PeelingOption: git.AppendPeeled,
-	})
-	if err != nil {
-		return nil, err
+	remoteByName := make(map[string]branchRef)
+	for _, branch := range remote {
+		remoteByName[branch.name] = branch
 	}
 
-	result := make([]Branch, 0)
-	err = branches.ForEach(func(ref *plumbing.Reference) error {
-		status := "local"
-		for _, originRef := range originRefs {
-			if !originRef.Name().IsBranch() {
-				continue
+	result := make([]Branch, 0, len(localByName)+len(remoteByName))
+	seenRemoteKeys := make(map[string]struct{})
+
+	for localName, localRef := range localByName {
+		remoteKey := "origin/" + localName
+		remoteRef, hasRemote := remoteByName[remoteKey]
+
+		var related *RelatedBranch
+		if hasRemote {
+			relation, relErr := projectGit.compareCommits(localRef.hash, remoteRef.hash)
+			if relErr != nil {
+				return nil, relErr
 			}
-			// todo: check the actual upstream for the branch instead of guessing through equality
-			if originRef.Name().Short() == ref.Name().Short() {
-				status = "synced"
-				break
+			var status BranchStatus
+			switch relation {
+			case commitEqual:
+				status = SyncedBranch
+			case commitAhead:
+				status = AheadBranch
+			case commitBehind:
+				status = BehindBranch
+			case commitDiverged:
+				status = DivergedBranch
 			}
+			related = &RelatedBranch{
+				Name:      remoteRef.name,
+				UpdatedAt: time.Now(),
+				Author:    "",
+				Remote:    &remoteRef.remote,
+				Status:    status,
+			}
+			seenRemoteKeys[remoteKey] = struct{}{}
 		}
 
-		commit, err := projectGit.repository.CommitObject(ref.Hash())
+		commit, err := projectGit.repository.CommitObject(localRef.hash)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		author := commit.Author.Name
@@ -91,22 +123,115 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			author = "you"
 		}
 
-		// todo: keeping the remote name is 100% important
 		result = append(result, Branch{
-			Name:      ref.Name().Short(),
+			Name:      localRef.name,
 			Author:    author,
-			Status:    status,
 			UpdatedAt: commit.Author.When,
+			Related:   related,
 		})
+	}
 
-		return nil
-	})
+	for key, remoteRef := range remoteByName {
+		if _, seen := seenRemoteKeys[key]; seen {
+			continue
+		}
 
+		commit, err := projectGit.repository.CommitObject(remoteRef.hash)
+		if err != nil {
+			return nil, err
+		}
+
+		author := commit.Author.Name
+		if author == user.Name {
+			author = "you"
+		}
+
+		result = append(result, Branch{
+			Name:      remoteRef.name,
+			Author:    author,
+			UpdatedAt: commit.Author.When,
+			Remote:    &remoteRef.remote,
+		})
+	}
+
+	return result, nil
+}
+
+type branchRef struct {
+	name     string
+	refName  plumbing.ReferenceName
+	hash     plumbing.Hash
+	isRemote bool
+	remote   string
+}
+
+func (projectGit *ProjectGit) getLocalBranches() ([]branchRef, error) {
+	localIter, err := projectGit.repository.Branches()
 	if err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	branches := make([]branchRef, 0)
+	err = localIter.ForEach(func(ref *plumbing.Reference) error {
+		name := ref.Name().Short()
+		branches = append(branches, branchRef{
+			name:     name,
+			refName:  ref.Name(),
+			hash:     ref.Hash(),
+			isRemote: false,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return branches, nil
+}
+
+func (projectGit *ProjectGit) getRemoteBranches() ([]branchRef, error) {
+	refs, err := projectGit.repository.References()
+	if err != nil {
+		return nil, err
+	}
+
+	branches := make([]branchRef, 0)
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		if !ref.Name().IsRemote() || !ref.Name().IsBranch() {
+			return nil
+		}
+
+		short := ref.Name().Short() // e.g. origin/main
+		remote, branchName := splitRemoteBranchShort(short)
+		if remote == "" || branchName == "" {
+			return nil
+		}
+
+		key := remote + "/" + branchName
+		branches = append(branches, branchRef{
+			name:     key,
+			refName:  ref.Name(),
+			hash:     ref.Hash(),
+			isRemote: true,
+			remote:   remote,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return branches, nil
+}
+
+func splitRemoteBranchShort(short string) (remote string, branch string) {
+	for i := 0; i < len(short); i++ {
+		if short[i] == '/' {
+			if i == 0 || i == len(short)-1 {
+				return "", ""
+			}
+			return short[:i], short[i+1:]
+		}
+	}
+	return "", ""
 }
 
 type User struct {

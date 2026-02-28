@@ -7,6 +7,7 @@ import (
 
 	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/projects"
+	"github.com/andrew-malikov/workspace/vcs"
 	"github.com/andrew-malikov/workspace/view"
 
 	"github.com/urfave/cli/v3"
@@ -70,13 +71,13 @@ func NewCommand() *cli.Command {
 
 var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
-type branch struct {
+type branchItem struct {
 	title, desc string
 }
 
-func (i branch) Title() string       { return i.title }
-func (i branch) Description() string { return i.desc }
-func (i branch) FilterValue() string { return i.title }
+func (i branchItem) Title() string       { return i.title }
+func (i branchItem) Description() string { return i.desc }
+func (i branchItem) FilterValue() string { return i.title }
 
 type ui struct {
 	list list.Model
@@ -107,16 +108,35 @@ func (m ui) View() string {
 }
 
 func newUi(branches []projects.StaleBranch) ui {
-	items := make([]list.Item, len(branches))
-	for i := range branches {
+	items := make([]list.Item, 0)
+	for _, branch := range branches {
 		stale := "[ ]"
-		if branches[i].IsStale {
+		if branch.IsStale {
 			stale = "[x]"
 		}
-		items[i] = branch{
-			title: fmt.Sprintf("%s %s is %s", stale, branches[i].Name, branches[i].Status),
-			desc:  fmt.Sprintf("%s at %s", branches[i].Author, branches[i].UpdatedAt.Format("2 Jan 2006, 3:04 PM")),
+		title := fmt.Sprintf("%s %s", stale, branch.Name)
+		if branch.Remote != nil {
+			title = fmt.Sprintf("%s at %s", title, *branch.Remote)
+		} else if branch.Related != nil {
+			status := ""
+			switch branch.Related.Status {
+			case vcs.AheadBranch:
+				status = "ahead"
+			case vcs.BehindBranch:
+				status = "behind"
+			case vcs.DivergedBranch:
+				status = "diverged"
+			case vcs.SyncedBranch:
+				status = "synced"
+			}
+			title = fmt.Sprintf("%s is %s with %s", title, status, *branch.Remote)
+		} else {
+			title = fmt.Sprintf("%s is local only", title)
 		}
+		items = append(items, branchItem{
+			title: title,
+			desc:  fmt.Sprintf("%s at %s", branch.Author, branch.UpdatedAt.Format("2 Jan 2006, 3:04 PM")),
+		})
 	}
 	m := ui{list: list.New(items, list.NewDefaultDelegate(), 0, 0)}
 	m.list.Title = "Stale Branches"
