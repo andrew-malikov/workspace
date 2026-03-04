@@ -129,7 +129,7 @@ func newUi(branches []projects.StaleBranch) ui {
 			case vcs.SyncedBranch:
 				status = "synced"
 			}
-			title = fmt.Sprintf("%s is %s with %s", title, status, *branch.Remote)
+			title = fmt.Sprintf("%s is %s with %s", title, status, *branch.Related.Remote)
 		} else {
 			title = fmt.Sprintf("%s is local only", title)
 		}

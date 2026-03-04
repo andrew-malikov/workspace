@@ -1,6 +1,8 @@
 package vcs
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v6"
@@ -55,7 +57,11 @@ type RelatedBranch struct {
 }
 
 func (projectGit *ProjectGit) Fetch() error {
-	return projectGit.repository.Fetch(&git.FetchOptions{Prune: true})
+	err := projectGit.repository.Fetch(&git.FetchOptions{RemoteName: "origin", Prune: true})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return err
+	}
+	return nil
 }
 
 func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
@@ -83,9 +89,7 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 	seenRemoteKeys := make(map[string]struct{})
 
 	for localName, localRef := range localByName {
-		// todo: don't hardcode origin, grab the proper remote name
-		// 		 what to do if there several ones? find the first that has it
-		remoteKey := "origin/" + localName
+		remoteKey := localName
 		remoteRef, hasRemote := remoteByName[remoteKey]
 
 		var related *RelatedBranch
@@ -105,16 +109,23 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			case commitDiverged:
 				status = DivergedBranch
 			}
+
+			commit, err := projectGit.repository.CommitObject(remoteRef.hash)
+			if err != nil {
+				return nil, err
+			}
+
+			author := commit.Author.Name
+			if author == user.Name {
+				author = "you"
+			}
+
 			related = &RelatedBranch{
 				Name:      remoteRef.name,
-				UpdatedAt: time.Now(),
-				// todo: surely showing up who's author is must have
-				// 	     it's okay to use latest commit
-				// 	     BUT there should be a better strategy
-				// 		 check the median comment's author, first and the last
-				Author: "",
-				Remote: &remoteRef.remote,
-				Status: status,
+				UpdatedAt: commit.Author.When,
+				Author:    author,
+				Remote:    &remoteRef.remote,
+				Status:    status,
 			}
 			seenRemoteKeys[remoteKey] = struct{}{}
 		}
@@ -195,6 +206,11 @@ func (projectGit *ProjectGit) getLocalBranches() ([]branchRef, error) {
 }
 
 func (projectGit *ProjectGit) getRemoteBranches() ([]branchRef, error) {
+	remotes, err := projectGit.repository.Remotes()
+	if err != nil {
+		return nil, err
+	}
+
 	refs, err := projectGit.repository.References()
 	if err != nil {
 		return nil, err
@@ -202,23 +218,26 @@ func (projectGit *ProjectGit) getRemoteBranches() ([]branchRef, error) {
 
 	branches := make([]branchRef, 0)
 	err = refs.ForEach(func(ref *plumbing.Reference) error {
-		if !ref.Name().IsRemote() || !ref.Name().IsBranch() {
+		if !ref.Name().IsRemote() {
 			return nil
 		}
 
 		short := ref.Name().Short() // e.g. origin/main
-		remote, branchName := splitRemoteBranchShort(short)
-		if remote == "" || branchName == "" {
+		remote, branch, err := splitRemoteBranchShort(short, remotes)
+		if err != nil {
 			return nil
 		}
 
-		key := remote + "/" + branchName
+		if *branch == plumbing.HEAD.Short() {
+			return nil
+		}
+
 		branches = append(branches, branchRef{
-			name:     key,
+			name:     *branch,
 			refName:  ref.Name(),
 			hash:     ref.Hash(),
 			isRemote: true,
-			remote:   remote,
+			remote:   remote.Config().Name,
 		})
 		return nil
 	})
@@ -228,16 +247,16 @@ func (projectGit *ProjectGit) getRemoteBranches() ([]branchRef, error) {
 	return branches, nil
 }
 
-func splitRemoteBranchShort(short string) (remote string, branch string) {
-	for i := 0; i < len(short); i++ {
-		if short[i] == '/' {
-			if i == 0 || i == len(short)-1 {
-				return "", ""
-			}
-			return short[:i], short[i+1:]
+func splitRemoteBranchShort(short string, remotes []*git.Remote) (remote *git.Remote, branch *string, err error) {
+	// remote names can be tricky to define e.g. "my-origin/here"
+	// is a valid remote name and you can't parse it out of "refs/remotes/my-origin/here/my-branch"
+	// without knowing what part the remote name actually takes between the branch and the remote
+	for _, remote := range remotes {
+		if branch, cutout := strings.CutPrefix(short, remote.Config().Name+"/"); cutout {
+			return remote, &branch, nil
 		}
 	}
-	return "", ""
+	return nil, nil, fmt.Errorf("found no remotes in ref %s", short)
 }
 
 type User struct {

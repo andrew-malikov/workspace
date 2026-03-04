@@ -71,10 +71,8 @@ func (project Project) ListStaleBranches(fetch bool) ([]StaleBranch, error) {
 		return nil, err
 	}
 
-	if fetch {
-		if err := git.Fetch(); err != nil {
-			return nil, err
-		}
+	if err := git.Fetch(); err != nil {
+		return nil, err
 	}
 
 	branches, err := git.ListBranches()
