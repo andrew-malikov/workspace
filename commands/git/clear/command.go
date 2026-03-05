@@ -12,9 +12,9 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 func NewCommand() *cli.Command {
@@ -60,7 +60,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			if _, err := tea.NewProgram(newUi(branches), tea.WithAltScreen()).Run(); err != nil {
+			if _, err := tea.NewProgram(newUi(branches)).Run(); err != nil {
 				return err
 			}
 
@@ -89,7 +89,7 @@ func (model ui) Init() tea.Cmd {
 
 func (m ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -103,8 +103,10 @@ func (m ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m ui) View() string {
-	return docStyle.Render(m.list.View())
+func (m ui) View() tea.View {
+	view := tea.NewView(docStyle.Render(m.list.View()))
+	view.AltScreen = true
+	return view
 }
 
 func newUi(branches []projects.StaleBranch) ui {
