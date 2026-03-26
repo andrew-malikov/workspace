@@ -1,6 +1,7 @@
 package vcs
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -33,10 +34,13 @@ const (
 //
 //     has Related and no Remote and Related has Remote
 type Branch struct {
-	Name      string
-	UpdatedAt time.Time
-	Author    string
-	Remote    *string
+	Name        string
+	Hash        plumbing.Hash
+	Ref         plumbing.ReferenceName
+	UpdatedAt   time.Time
+	Author      string
+	OwnedByUser bool
+	Remote      *string
 	// todo: sure there may be many remotes
 	// 		 it looks like branches are grouped by some kind of ref
 	// 	     so that even different refs can be accostomed via different upstreams
@@ -48,12 +52,36 @@ type Branch struct {
 	Related *RelatedBranch
 }
 
+func (branch Branch) HasLocal() bool {
+	return branch.Remote == nil
+}
+
+func (branch Branch) HasRemote() bool {
+	if branch.Remote != nil {
+		return true
+	}
+	return branch.Related != nil && branch.Related.Remote != nil
+}
+
+func (branch Branch) ResolveRemote() (string, bool) {
+	if branch.Remote != nil {
+		return *branch.Remote, true
+	}
+	if branch.Related != nil && branch.Related.Remote != nil {
+		return *branch.Related.Remote, true
+	}
+	return "", false
+}
+
 type RelatedBranch struct {
-	Name      string
-	UpdatedAt time.Time
-	Author    string
-	Remote    *string
-	Status    BranchStatus
+	Name        string
+	Hash        plumbing.Hash
+	Ref         plumbing.ReferenceName
+	UpdatedAt   time.Time
+	Author      string
+	OwnedByUser bool
+	Remote      *string
+	Status      BranchStatus
 }
 
 func (projectGit *ProjectGit) Fetch() error {
@@ -121,11 +149,14 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			}
 
 			related = &RelatedBranch{
-				Name:      remoteRef.name,
-				UpdatedAt: commit.Author.When,
-				Author:    author,
-				Remote:    &remoteRef.remote,
-				Status:    status,
+				Name:        remoteRef.name,
+				Hash:        remoteRef.hash,
+				Ref:         remoteRef.refName,
+				UpdatedAt:   commit.Author.When,
+				Author:      author,
+				OwnedByUser: isCurrentUser(user, commit.Author.Name, commit.Author.Email),
+				Remote:      &remoteRef.remote,
+				Status:      status,
 			}
 			seenRemoteKeys[remoteKey] = struct{}{}
 		}
@@ -141,10 +172,13 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 		}
 
 		result = append(result, Branch{
-			Name:      localRef.name,
-			Author:    author,
-			UpdatedAt: commit.Author.When,
-			Related:   related,
+			Name:        localRef.name,
+			Hash:        localRef.hash,
+			Ref:         localRef.refName,
+			Author:      author,
+			OwnedByUser: isCurrentUser(user, commit.Author.Name, commit.Author.Email),
+			UpdatedAt:   commit.Author.When,
+			Related:     related,
 		})
 	}
 
@@ -164,10 +198,13 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 		}
 
 		result = append(result, Branch{
-			Name:      remoteRef.name,
-			Author:    author,
-			UpdatedAt: commit.Author.When,
-			Remote:    &remoteRef.remote,
+			Name:        remoteRef.name,
+			Hash:        remoteRef.hash,
+			Ref:         remoteRef.refName,
+			Author:      author,
+			OwnedByUser: isCurrentUser(user, commit.Author.Name, commit.Author.Email),
+			UpdatedAt:   commit.Author.When,
+			Remote:      &remoteRef.remote,
 		})
 	}
 
@@ -307,4 +344,64 @@ func (projectGit *ProjectGit) ResolveUser() User {
 	}
 
 	return *user
+}
+
+func isCurrentUser(user User, authorName string, authorEmail string) bool {
+	if user.Email != "" && authorEmail != "" {
+		return user.Email == authorEmail
+	}
+	if user.Name != "" && authorName != "" {
+		return user.Name == authorName
+	}
+	return false
+}
+
+func (projectGit *ProjectGit) DeleteBranch(branch Branch) error {
+	if branch.HasLocal() {
+		if err := projectGit.deleteLocalBranch(branch); err != nil {
+			return err
+		}
+	}
+
+	if remote, ok := branch.ResolveRemote(); ok {
+		if err := projectGit.deleteRemoteBranch(remote, branch.Name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (projectGit *ProjectGit) deleteLocalBranch(branch Branch) error {
+	head, err := projectGit.repository.Head()
+	if err != nil {
+		return err
+	}
+
+	if head.Name().IsBranch() && head.Name().Short() == branch.Name {
+		return fmt.Errorf("cannot delete the checked out branch %s", branch.Name)
+	}
+
+	if err := projectGit.repository.Storer.RemoveReference(branch.Ref); err != nil {
+		return err
+	}
+
+	if err := projectGit.repository.DeleteBranch(branch.Name); err != nil && err != git.ErrBranchNotFound {
+		return err
+	}
+
+	return nil
+}
+
+func (projectGit *ProjectGit) deleteRemoteBranch(remote string, name string) error {
+	err := projectGit.repository.Push(&git.PushOptions{
+		RemoteName: remote,
+		RefSpecs: []config.RefSpec{
+			config.RefSpec(fmt.Sprintf(":refs/heads/%s", name)),
+		},
+	})
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return err
+	}
+	return nil
 }

@@ -2,45 +2,52 @@ package clear
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/andrew-malikov/workspace/projects"
+	"charm.land/bubbles/v2/list"
 	"github.com/andrew-malikov/workspace/vcs"
 )
 
 type branchItem struct {
-	title, desc string
+	branch vcs.Branch
+	title  string
+	desc   string
+	meta   string
 }
 
-func (i branchItem) Title() string       { return i.title }
-func (i branchItem) Description() string { return i.desc }
-func (i branchItem) FilterValue() string { return i.title }
+func (item branchItem) Title() string       { return item.title }
+func (item branchItem) Description() string { return item.desc }
+func (item branchItem) FilterValue() string {
+	return strings.Join([]string{item.title, item.meta}, " ")
+}
 
-func makeBranchItem(branch projects.StaleBranch) branchItem {
-	title := branch.Name
-
-	if branch.Remote != nil {
-		title = fmt.Sprintf("%s at %s", title, *branch.Remote)
-	} else if branch.Related != nil {
-		status := ""
-		switch branch.Related.Status {
-		case vcs.AheadBranch:
-			status = "ahead of"
-		case vcs.BehindBranch:
-			status = "behind"
-		case vcs.DivergedBranch:
-			status = "diverged from"
-		case vcs.SyncedBranch:
-			status = "synced with"
-		}
-		remote := ""
-		if branch.Related.Remote != nil {
-			remote = *branch.Related.Remote + "/"
-		}
-		title = fmt.Sprintf("%s %s %s%s", title, status, remote, branch.Related.Name)
-	} else {
-		title = fmt.Sprintf("%s local only", title)
+func makeBranchItem(branch vcs.Branch) branchItem {
+	locations := make([]string, 0, 2)
+	if branch.HasLocal() {
+		locations = append(locations, "local")
+	}
+	if remote, ok := branch.ResolveRemote(); ok {
+		locations = append(locations, remote)
 	}
 
-	desc := fmt.Sprintf("%s %s", branch.Author, branch.UpdatedAt.Format("2 Jan 2006, 3:04 PM"))
-	return branchItem{title: title, desc: desc}
+	desc := fmt.Sprintf("%s updated %s", branch.Author, branch.UpdatedAt.Format("2 Jan 2006, 3:04 PM"))
+	meta := strings.Join(locations, "  ")
+	if meta == "" {
+		meta = "detached"
+	}
+
+	return branchItem{
+		branch: branch,
+		title:  branch.Name,
+		desc:   desc,
+		meta:   meta,
+	}
+}
+
+func toListItems(branches []vcs.Branch) []list.Item {
+	items := make([]list.Item, 0, len(branches))
+	for _, branch := range branches {
+		items = append(items, makeBranchItem(branch))
+	}
+	return items
 }

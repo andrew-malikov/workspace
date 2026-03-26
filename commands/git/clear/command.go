@@ -5,6 +5,7 @@ import (
 	"os"
 
 	cfg "github.com/andrew-malikov/workspace/config"
+	"github.com/andrew-malikov/workspace/vcs"
 	"github.com/andrew-malikov/workspace/view"
 
 	"github.com/urfave/cli/v3"
@@ -16,22 +17,7 @@ func NewCommand() *cli.Command {
 	return &cli.Command{
 		Name:    "clear",
 		Aliases: []string{"clr", "c"},
-		Usage:   "clear hanging branches",
-		// todo: probably outdated by tui
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:    "dry-run",
-				Aliases: []string{"d"},
-				Value:   false,
-				Usage:   "only prints out the plan",
-			},
-			&cli.BoolFlag{
-				Name:    "team",
-				Aliases: []string{"t"},
-				Value:   false,
-				Usage:   "include team members",
-			},
-		},
+		Usage:   "clear branches owned by the current git user",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			config, err := cfg.LoadConfig()
 			if err != nil {
@@ -50,12 +36,17 @@ func NewCommand() *cli.Command {
 				return view.RenderDirectoryIsNotTrackedYet(dir)
 			}
 
-			branches, err := project.ListStaleBranches(false)
+			git, err := vcs.NewProjectGit(project.Dir)
 			if err != nil {
 				return err
 			}
 
-			if _, err := tea.NewProgram(newUi(branches)).Run(); err != nil {
+			branches, err := project.ListOwnBranches(false)
+			if err != nil {
+				return err
+			}
+
+			if _, err := tea.NewProgram(newUi(branches, git)).Run(); err != nil {
 				return err
 			}
 

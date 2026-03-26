@@ -71,8 +71,10 @@ func (project Project) ListStaleBranches(fetch bool) ([]StaleBranch, error) {
 		return nil, err
 	}
 
-	if err := git.Fetch(); err != nil {
-		return nil, err
+	if fetch {
+		if err := git.Fetch(); err != nil {
+			return nil, err
+		}
 	}
 
 	branches, err := git.ListBranches()
@@ -93,4 +95,31 @@ func (project Project) ListStaleBranches(fetch bool) ([]StaleBranch, error) {
 	}
 
 	return staleBranches, nil
+}
+
+func (project Project) ListOwnBranches(fetch bool) ([]vcs.Branch, error) {
+	git, err := vcs.NewProjectGit(project.Dir)
+	if err != nil {
+		return nil, err
+	}
+
+	if fetch {
+		if err := git.Fetch(); err != nil {
+			return nil, err
+		}
+	}
+
+	branches, err := git.ListBranches()
+	if err != nil {
+		return nil, err
+	}
+
+	owned := make([]vcs.Branch, 0, len(branches))
+	for _, branch := range branches {
+		if branch.OwnedByUser || (branch.Related != nil && branch.Related.OwnedByUser) {
+			owned = append(owned, branch)
+		}
+	}
+
+	return owned, nil
 }
