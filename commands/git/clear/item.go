@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/list"
-	"github.com/andrew-malikov/workspace/vcs"
+	"github.com/andrew-malikov/workspace/projects"
 )
 
 type branchItem struct {
-	branch vcs.Branch
+	branch projects.StaleBranch
 	title  string
 	desc   string
 	meta   string
@@ -21,7 +21,7 @@ func (item branchItem) FilterValue() string {
 	return strings.Join([]string{item.title, item.meta}, " ")
 }
 
-func makeBranchItem(branch vcs.Branch) branchItem {
+func makeBranchItem(branch projects.StaleBranch) branchItem {
 	locations := make([]string, 0, 2)
 	if branch.HasLocal() {
 		locations = append(locations, "local")
@@ -44,7 +44,7 @@ func makeBranchItem(branch vcs.Branch) branchItem {
 	}
 }
 
-func toListItems(branches []vcs.Branch) []list.Item {
+func toListItems(branches []projects.StaleBranch) []list.Item {
 	items := make([]list.Item, 0, len(branches))
 	for _, branch := range branches {
 		items = append(items, makeBranchItem(branch))

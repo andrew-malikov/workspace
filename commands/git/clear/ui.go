@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/andrew-malikov/workspace/projects"
 	"github.com/andrew-malikov/workspace/vcs"
 )
 
@@ -21,7 +22,7 @@ var (
 )
 
 type deleteBranchMsg struct {
-	branch vcs.Branch
+	branch projects.StaleBranch
 	err    error
 }
 
@@ -82,7 +83,7 @@ type ui struct {
 	statusErr bool
 }
 
-func newUi(branches []vcs.Branch, projectGit *vcs.ProjectGit) ui {
+func newUi(branches []projects.StaleBranch, projectGit *vcs.ProjectGit) ui {
 	branchList := list.New(toListItems(branches), newBubbleDelegate(), 0, 0)
 	branchList.Title = "Your git branches"
 	branchList.SetShowStatusBar(false)
@@ -137,7 +138,7 @@ func (model ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return model, nil
 			}
 			return model, func() tea.Msg {
-				return deleteBranchMsg{branch: item.branch, err: model.git.DeleteBranch(item.branch)}
+				return deleteBranchMsg{branch: item.branch, err: model.git.DeleteBranch(item.branch.Branch)}
 			}
 		}
 
@@ -160,7 +161,7 @@ func (model ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		model.status = deletedBranchMessage(typed.branch)
+		model.status = deletedBranchMessage(typed.branch.Branch)
 		model.statusErr = false
 		return model, nil
 	}
@@ -172,7 +173,7 @@ func (model ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (model ui) View() tea.View {
 	header := titleStyle.Render("ws git clear")
-	subtitle := subtitleStyle.Render("Branches authored by the current git user")
+	subtitle := subtitleStyle.Render("Branches owned by the current git user from branch history")
 
 	statusStyle := statusInfoStyle
 	if model.statusErr {

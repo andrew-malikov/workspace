@@ -17,7 +17,7 @@ func NewCommand() *cli.Command {
 	return &cli.Command{
 		Name:    "clear",
 		Aliases: []string{"clr", "c"},
-		Usage:   "clear branches owned by the current git user",
+		Usage:   "clear branches owned by the current git user based on branch history",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			config, err := cfg.LoadConfig()
 			if err != nil {
@@ -41,7 +41,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			branches, err := project.ListOwnBranches(false)
+			branches, err := project.ListStaleBranches(false)
 			if err != nil {
 				return err
 			}

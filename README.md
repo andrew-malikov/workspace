@@ -56,7 +56,7 @@ It would check whether any other compose is up (across tracked ones) and down it
 
 ## Git Cleanup
 
-Lots of people make lots of code and thus lots of stale branches (me too by the way). Prints the stale branches to clean up (only author's branches):
+Lots of people make lots of code and thus lots of stale branches (me too by the way). Prints the stale branches to clean up (only branches owned by the current git user based on branch history):
 
 ```bash
 ws git cleanup --dry-run

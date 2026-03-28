@@ -9,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 )
 
 type BranchStatus = int
@@ -34,13 +35,13 @@ const (
 //
 //     has Related and no Remote and Related has Remote
 type Branch struct {
-	Name        string
-	Hash        plumbing.Hash
-	Ref         plumbing.ReferenceName
-	UpdatedAt   time.Time
-	Author      string
-	OwnedByUser bool
-	Remote      *string
+	Name               string
+	Hash               plumbing.Hash
+	Ref                plumbing.ReferenceName
+	UpdatedAt          time.Time
+	Author             string
+	OwnedByCurrentUser bool
+	Remote             *string
 	// todo: sure there may be many remotes
 	// 		 it looks like branches are grouped by some kind of ref
 	// 	     so that even different refs can be accostomed via different upstreams
@@ -74,14 +75,14 @@ func (branch Branch) ResolveRemote() (string, bool) {
 }
 
 type RelatedBranch struct {
-	Name        string
-	Hash        plumbing.Hash
-	Ref         plumbing.ReferenceName
-	UpdatedAt   time.Time
-	Author      string
-	OwnedByUser bool
-	Remote      *string
-	Status      BranchStatus
+	Name               string
+	Hash               plumbing.Hash
+	Ref                plumbing.ReferenceName
+	UpdatedAt          time.Time
+	Author             string
+	OwnedByCurrentUser bool
+	Remote             *string
+	Status             BranchStatus
 }
 
 func (projectGit *ProjectGit) Fetch() error {
@@ -144,19 +145,24 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			}
 
 			author := commit.Author.Name
-			if author == user.Name {
+			if user.Match(commit.Author) {
 				author = "you"
 			}
 
+			ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user)
+			if err != nil {
+				return nil, err
+			}
+
 			related = &RelatedBranch{
-				Name:        remoteRef.name,
-				Hash:        remoteRef.hash,
-				Ref:         remoteRef.refName,
-				UpdatedAt:   commit.Author.When,
-				Author:      author,
-				OwnedByUser: isCurrentUser(user, commit.Author.Name, commit.Author.Email),
-				Remote:      &remoteRef.remote,
-				Status:      status,
+				Name:               remoteRef.name,
+				Hash:               remoteRef.hash,
+				Ref:                remoteRef.refName,
+				UpdatedAt:          commit.Author.When,
+				Author:             author,
+				OwnedByCurrentUser: ownedByCurrentUser,
+				Remote:             &remoteRef.remote,
+				Status:             status,
 			}
 			seenRemoteKeys[remoteKey] = struct{}{}
 		}
@@ -167,18 +173,23 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 		}
 
 		author := commit.Author.Name
-		if author == user.Name {
+		if user.Match(commit.Author) {
 			author = "you"
 		}
 
+		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(localRef.hash, user)
+		if err != nil {
+			return nil, err
+		}
+
 		result = append(result, Branch{
-			Name:        localRef.name,
-			Hash:        localRef.hash,
-			Ref:         localRef.refName,
-			Author:      author,
-			OwnedByUser: isCurrentUser(user, commit.Author.Name, commit.Author.Email),
-			UpdatedAt:   commit.Author.When,
-			Related:     related,
+			Name:               localRef.name,
+			Hash:               localRef.hash,
+			Ref:                localRef.refName,
+			Author:             author,
+			OwnedByCurrentUser: ownedByCurrentUser,
+			UpdatedAt:          commit.Author.When,
+			Related:            related,
 		})
 	}
 
@@ -193,22 +204,50 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 		}
 
 		author := commit.Author.Name
-		if author == user.Name {
+		if user.Match(commit.Author) {
 			author = "you"
 		}
 
+		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user)
+		if err != nil {
+			return nil, err
+		}
+
 		result = append(result, Branch{
-			Name:        remoteRef.name,
-			Hash:        remoteRef.hash,
-			Ref:         remoteRef.refName,
-			Author:      author,
-			OwnedByUser: isCurrentUser(user, commit.Author.Name, commit.Author.Email),
-			UpdatedAt:   commit.Author.When,
-			Remote:      &remoteRef.remote,
+			Name:               remoteRef.name,
+			Hash:               remoteRef.hash,
+			Ref:                remoteRef.refName,
+			Author:             author,
+			OwnedByCurrentUser: ownedByCurrentUser,
+			UpdatedAt:          commit.Author.When,
+			Remote:             &remoteRef.remote,
 		})
 	}
 
 	return result, nil
+}
+
+func (projectGit *ProjectGit) isBranchOwnedByUser(branchHash plumbing.Hash, user User) (bool, error) {
+	commit, err := projectGit.repository.CommitObject(branchHash)
+	if err != nil {
+		return false, err
+	}
+
+	isOwnedByUser := false
+	depth := 0
+	err = commit.Parents().ForEach(func(commit *object.Commit) error {
+		if depth > 2 || isOwnedByUser {
+			return nil
+		}
+
+		isOwnedByUser = user.Match(commit.Author)
+
+		depth++
+
+		return nil
+	})
+
+	return isOwnedByUser, err
 }
 
 type branchRef struct {
@@ -346,12 +385,12 @@ func (projectGit *ProjectGit) ResolveUser() User {
 	return *user
 }
 
-func isCurrentUser(user User, authorName string, authorEmail string) bool {
-	if user.Email != "" && authorEmail != "" {
-		return user.Email == authorEmail
+func (user User) Match(author object.Signature) bool {
+	if user.Email != "" && author.Email != "" {
+		return user.Email == author.Email
 	}
-	if user.Name != "" && authorName != "" {
-		return user.Name == authorName
+	if user.Name != "" && author.Name != "" {
+		return user.Name == author.Name
 	}
 	return false
 }
