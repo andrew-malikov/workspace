@@ -42,6 +42,7 @@ type Branch struct {
 	UpdatedAt          time.Time
 	Author             string
 	OwnedByCurrentUser bool
+	MatchingCommits    []BranchCommitPreview
 	Remote             *string
 	// todo: sure there may be many remotes
 	// 		 it looks like branches are grouped by some kind of ref
@@ -82,8 +83,15 @@ type RelatedBranch struct {
 	UpdatedAt          time.Time
 	Author             string
 	OwnedByCurrentUser bool
+	MatchingCommits    []BranchCommitPreview
 	Remote             *string
 	Status             BranchStatus
+}
+
+type BranchCommitPreview struct {
+	Author  string
+	Subject string
+	At      time.Time
 }
 
 type BranchOwnershipFilterInput struct {
@@ -259,7 +267,7 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 				author = "you"
 			}
 
-			ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user, ownership)
+			ownershipResult, err := projectGit.resolveBranchOwnership(remoteRef.hash, user, ownership)
 			if err != nil {
 				return nil, err
 			}
@@ -270,7 +278,8 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 				Ref:                remoteRef.refName,
 				UpdatedAt:          commit.Author.When,
 				Author:             author,
-				OwnedByCurrentUser: ownedByCurrentUser,
+				OwnedByCurrentUser: ownershipResult.Matched,
+				MatchingCommits:    ownershipResult.Previews,
 				Remote:             &remoteRef.remote,
 				Status:             status,
 			}
@@ -287,7 +296,7 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 			author = "you"
 		}
 
-		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(localRef.hash, user, ownership)
+		ownershipResult, err := projectGit.resolveBranchOwnership(localRef.hash, user, ownership)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +306,8 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 			Hash:               localRef.hash,
 			Ref:                localRef.refName,
 			Author:             author,
-			OwnedByCurrentUser: ownedByCurrentUser,
+			OwnedByCurrentUser: ownershipResult.Matched,
+			MatchingCommits:    ownershipResult.Previews,
 			UpdatedAt:          commit.Author.When,
 			Related:            related,
 		})
@@ -318,7 +328,7 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 			author = "you"
 		}
 
-		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user, ownership)
+		ownershipResult, err := projectGit.resolveBranchOwnership(remoteRef.hash, user, ownership)
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +338,8 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 			Hash:               remoteRef.hash,
 			Ref:                remoteRef.refName,
 			Author:             author,
-			OwnedByCurrentUser: ownedByCurrentUser,
+			OwnedByCurrentUser: ownershipResult.Matched,
+			MatchingCommits:    ownershipResult.Previews,
 			UpdatedAt:          commit.Author.When,
 			Remote:             &remoteRef.remote,
 		})
@@ -337,37 +348,86 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 	return result, nil
 }
 
+type branchOwnershipResult struct {
+	Matched  bool
+	Previews []BranchCommitPreview
+}
+
 func (projectGit *ProjectGit) isBranchOwnedByUser(branchHash plumbing.Hash, user User, ownership BranchOwnershipOptions) (bool, error) {
-	commits, err := projectGit.listBranchCommits(branchHash, ownership.LookbackCommits)
+	result, err := projectGit.resolveBranchOwnership(branchHash, user, ownership)
 	if err != nil {
 		return false, err
 	}
 
-	return ownership.MatchCommits(commits, user), nil
+	return result.Matched, nil
+}
+
+func (projectGit *ProjectGit) resolveBranchOwnership(branchHash plumbing.Hash, user User, ownership BranchOwnershipOptions) (branchOwnershipResult, error) {
+	commits, err := projectGit.listBranchCommits(branchHash, ownership.LookbackCommits)
+	if err != nil {
+		return branchOwnershipResult{}, err
+	}
+
+	return ownership.MatchCommitsWithPreviews(commits, user), nil
 }
 
 func (options BranchOwnershipOptions) MatchCommits(commits []*object.Commit, user User) bool {
+	return options.MatchCommitsWithPreviews(commits, user).Matched
+}
+
+func (options BranchOwnershipOptions) MatchCommitsWithPreviews(commits []*object.Commit, user User) branchOwnershipResult {
 	included := false
 	useFallbackUser := !options.HasIncludeRules()
+	previews := make([]BranchCommitPreview, 0, 3)
 
 	for _, commit := range commits {
 		if options.HasExcludeRules() && options.Exclude.MatchCommit(commit) {
-			return false
+			return branchOwnershipResult{}
 		}
 
 		if options.HasIncludeRules() {
 			if options.Include.MatchCommit(commit) {
 				included = true
+				previews = appendBranchCommitPreview(previews, commit, user)
 			}
 			continue
 		}
 
 		if useFallbackUser && user.Match(commit.Author) {
 			included = true
+			previews = appendBranchCommitPreview(previews, commit, user)
 		}
 	}
 
-	return included
+	return branchOwnershipResult{
+		Matched:  included,
+		Previews: previews,
+	}
+}
+
+func appendBranchCommitPreview(previews []BranchCommitPreview, commit *object.Commit, user User) []BranchCommitPreview {
+	if len(previews) >= 3 {
+		return previews
+	}
+
+	author := commit.Author.Name
+	if user.Match(commit.Author) {
+		author = "you"
+	}
+
+	subject := strings.TrimSpace(commit.Message)
+	if index := strings.IndexByte(subject, '\n'); index >= 0 {
+		subject = subject[:index]
+	}
+	if subject == "" {
+		subject = "(no commit message)"
+	}
+
+	return append(previews, BranchCommitPreview{
+		Author:  author,
+		Subject: subject,
+		At:      commit.Author.When,
+	})
 }
 
 func (projectGit *ProjectGit) listBranchCommits(branchHash plumbing.Hash, limit int) ([]*object.Commit, error) {

@@ -9,10 +9,11 @@ import (
 )
 
 type branchItem struct {
-	branch projects.StaleBranch
-	title  string
-	desc   string
-	meta   string
+	branch  projects.StaleBranch
+	title   string
+	desc    string
+	meta    string
+	commits []string
 }
 
 func (item branchItem) Title() string       { return item.title }
@@ -36,11 +37,22 @@ func makeBranchItem(branch projects.StaleBranch) branchItem {
 		meta = "detached"
 	}
 
+	matchingCommits := branch.MatchingCommits
+	if len(matchingCommits) == 0 && branch.Related != nil {
+		matchingCommits = branch.Related.MatchingCommits
+	}
+
+	commits := make([]string, 0, len(matchingCommits))
+	for _, commit := range matchingCommits {
+		commits = append(commits, fmt.Sprintf("%s %s", commit.At.Format("2 Jan 2006, 3:04 PM"), commit.Subject))
+	}
+
 	return branchItem{
-		branch: branch,
-		title:  branch.Name,
-		desc:   desc,
-		meta:   meta,
+		branch:  branch,
+		title:   branch.Name,
+		desc:    desc,
+		meta:    meta,
+		commits: commits,
 	}
 }
 

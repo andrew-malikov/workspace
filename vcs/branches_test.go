@@ -95,6 +95,80 @@ func TestBranchOwnershipIncludeDisablesFallback(t *testing.T) {
 	}
 }
 
+func TestBranchOwnershipMatchingPreviewsUseLatestMatchingCommits(t *testing.T) {
+	options, err := NewBranchOwnershipOptions(6,
+		BranchOwnershipFilterInput{MessagePatterns: []string{"^feat:"}},
+		BranchOwnershipFilterInput{},
+	)
+	if err != nil {
+		t.Fatalf("new options: %v", err)
+	}
+
+	result := options.MatchCommitsWithPreviews([]*object.Commit{
+		makeCommit("Me", "me@example.com", "feat: four\n\nbody"),
+		makeCommit("Me", "me@example.com", "fix: skipped"),
+		makeCommit("Me", "me@example.com", "feat: three"),
+		makeCommit("Me", "me@example.com", "feat: two"),
+		makeCommit("Me", "me@example.com", "feat: one"),
+	}, User{Name: "Me", Email: "me@example.com"})
+
+	if !result.Matched {
+		t.Fatal("expected branch to match include rules")
+	}
+
+	got := previewsToStrings(result.Previews)
+	want := []string{"you: feat: four", "you: feat: three", "you: feat: two"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected previews: got %v want %v", got, want)
+	}
+}
+
+func TestBranchOwnershipMatchingPreviewsFallbackToCurrentUser(t *testing.T) {
+	options, err := NewBranchOwnershipOptions(5, BranchOwnershipFilterInput{}, BranchOwnershipFilterInput{})
+	if err != nil {
+		t.Fatalf("new options: %v", err)
+	}
+
+	result := options.MatchCommitsWithPreviews([]*object.Commit{
+		makeCommit("Me", "me@example.com", "feat: latest mine"),
+		makeCommit("Other", "other@example.com", "feat: not mine"),
+		makeCommit("Me", "me@example.com", "feat: older mine"),
+	}, User{Name: "Me", Email: "me@example.com"})
+
+	if !result.Matched {
+		t.Fatal("expected fallback current-user match")
+	}
+
+	got := previewsToStrings(result.Previews)
+	want := []string{"you: feat: latest mine", "you: feat: older mine"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected previews: got %v want %v", got, want)
+	}
+}
+
+func TestBranchOwnershipMatchingPreviewsExcludedBranchReturnsNone(t *testing.T) {
+	options, err := NewBranchOwnershipOptions(5,
+		BranchOwnershipFilterInput{AuthorEmails: []string{"me@example.com"}},
+		BranchOwnershipFilterInput{MessagePatterns: []string{"^chore:"}},
+	)
+	if err != nil {
+		t.Fatalf("new options: %v", err)
+	}
+
+	result := options.MatchCommitsWithPreviews([]*object.Commit{
+		makeCommit("Me", "me@example.com", "feat: mine"),
+		makeCommit("Bot", "bot@example.com", "chore: release"),
+	}, User{Name: "Me", Email: "me@example.com"})
+
+	if result.Matched {
+		t.Fatal("expected exclude rule to suppress branch match")
+	}
+
+	if len(result.Previews) != 0 {
+		t.Fatalf("expected no previews when branch is excluded, got %v", previewsToStrings(result.Previews))
+	}
+}
+
 func TestListBranchCommitsHonorsLookbackAndIncludesHead(t *testing.T) {
 	dir := t.TempDir()
 	repo, hashes := createCommitHistory(t, dir, []commitSpec{
@@ -126,6 +200,14 @@ func makeCommit(name, email, message string) *object.Commit {
 		Author:  object.Signature{Name: name, Email: email},
 		Message: message,
 	}
+}
+
+func previewsToStrings(previews []BranchCommitPreview) []string {
+	result := make([]string, 0, len(previews))
+	for _, preview := range previews {
+		result = append(result, preview.Author+": "+preview.Subject)
+	}
+	return result
 }
 
 type commitSpec struct {

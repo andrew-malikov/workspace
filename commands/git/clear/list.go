@@ -17,9 +17,11 @@ type bubbleItem interface {
 	Title() string
 	Description() string
 	Meta() string
+	Commits() []string
 }
 
-func (item branchItem) Meta() string { return item.meta }
+func (item branchItem) Meta() string      { return item.meta }
+func (item branchItem) Commits() []string { return item.commits }
 
 type bubbleDelegate struct {
 	styles bubbleStyles
@@ -37,6 +39,7 @@ type bubbleStyles struct {
 	normalMeta     lipgloss.Style
 	selectedMeta   lipgloss.Style
 	match          lipgloss.Style
+	normalCommits  lipgloss.Style
 }
 
 func newBubbleStyles() bubbleStyles {
@@ -49,7 +52,6 @@ func newBubbleStyles() bubbleStyles {
 		selectedBubble: lipgloss.NewStyle().
 			Border(lipgloss.ThickBorder()).
 			BorderForeground(lipgloss.Color("81")).
-			Background(lipgloss.Color("236")).
 			Padding(0, 1).
 			MarginBottom(1),
 		normalTitle: lipgloss.NewStyle().
@@ -67,14 +69,15 @@ func newBubbleStyles() bubbleStyles {
 		selectedMeta: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("121")).
 			Bold(true),
-		match: lipgloss.NewStyle().Underline(true),
+		match:         lipgloss.NewStyle().Underline(true),
+		normalCommits: lipgloss.NewStyle().Foreground(lipgloss.Color("249")),
 	}
 }
 
 func newBubbleDelegate() bubbleDelegate {
 	return bubbleDelegate{
 		styles: newBubbleStyles(),
-		height: 3,
+		height: 6,
 		width:  0,
 	}
 }
@@ -101,6 +104,7 @@ func (delegate bubbleDelegate) Render(writer io.Writer, model list.Model, index 
 	titleStyle := delegate.styles.normalTitle
 	descStyle := delegate.styles.normalDesc
 	metaStyle := delegate.styles.normalMeta
+	commitsStyle := delegate.styles.normalCommits
 
 	if index == model.Index() && model.FilterState() != list.Filtering {
 		style = delegate.styles.selectedBubble
@@ -117,6 +121,10 @@ func (delegate bubbleDelegate) Render(writer io.Writer, model list.Model, index 
 	title := ansi.Truncate(item.Title(), textWidth, "...")
 	desc := ansi.Truncate(item.Description(), textWidth, "...")
 	meta := ansi.Truncate(item.Meta(), textWidth, "...")
+	commitLines := make([]string, 0, len(item.Commits()))
+	for _, commit := range item.Commits() {
+		commitLines = append(commitLines, commitsStyle.Render(ansi.Truncate(commit, textWidth, "...")))
+	}
 
 	if state := model.FilterState(); state == list.Filtering || state == list.FilterApplied {
 		matched := model.MatchesForItem(index)
@@ -126,11 +134,13 @@ func (delegate bubbleDelegate) Render(writer io.Writer, model list.Model, index 
 		}
 	}
 
-	content := strings.Join([]string{
+	contentLines := []string{
 		titleStyle.Render(title),
 		descStyle.Render(desc),
 		metaStyle.Render(meta),
-	}, "\n")
+	}
+	contentLines = append(contentLines, commitLines...)
+	content := strings.Join(contentLines, "\n")
 
 	fmt.Fprint(writer, style.Width(model.Width()).Render(content))
 }
