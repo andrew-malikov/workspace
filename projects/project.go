@@ -65,7 +65,7 @@ type StaleBranch struct {
 var STALE_INTERVAL = time.Hour * 24 * 14
 
 // todo: define list options instead of bunch of args
-func (project Project) ListStaleBranches(fetch bool) ([]StaleBranch, error) {
+func (project Project) ListStaleBranches(fetch bool, ownership vcs.BranchOwnershipOptions) ([]StaleBranch, error) {
 	git, err := vcs.NewProjectGit(project.Dir)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (project Project) ListStaleBranches(fetch bool) ([]StaleBranch, error) {
 		}
 	}
 
-	branches, err := git.ListBranches()
+	branches, err := git.ListBranches(ownership)
 	if err != nil {
 		return nil, err
 	}

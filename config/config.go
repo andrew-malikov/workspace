@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -14,13 +15,67 @@ import (
 )
 
 type Config struct {
-	Projects map[string]projects.Project
+	Projects map[string]projects.Project `toml:"projects"`
+	Git      GitConfig                   `toml:"git"`
+}
+
+type GitConfig struct {
+	Clear GitClearConfig `toml:"clear"`
+}
+
+type GitClearConfig struct {
+	Ownership GitClearOwnershipConfig `toml:"ownership"`
+}
+
+type GitClearOwnershipConfig struct {
+	LookbackCommits int                           `toml:"lookback_commits"`
+	Include         GitClearOwnershipFilterConfig `toml:"include"`
+	Exclude         GitClearOwnershipFilterConfig `toml:"exclude"`
+}
+
+type GitClearOwnershipFilterConfig struct {
+	AuthorEmails    []string `toml:"author_emails"`
+	AuthorNames     []string `toml:"author_names"`
+	MessagePatterns []string `toml:"message_patterns"`
 }
 
 func emptyConfig() Config {
 	return Config{
 		Projects: map[string]projects.Project{},
+		Git:      GitConfig{},
 	}
+}
+
+func (config *Config) Normalize() {
+	if config.Projects == nil {
+		config.Projects = map[string]projects.Project{}
+	}
+
+	if config.Git.Clear.Ownership.LookbackCommits <= 0 {
+		config.Git.Clear.Ownership.LookbackCommits = 3
+	}
+}
+
+func (config Config) Validate() error {
+	if err := validateMessagePatterns(config.Git.Clear.Ownership.Include.MessagePatterns, "git.clear.ownership.include.message_patterns"); err != nil {
+		return err
+	}
+
+	if err := validateMessagePatterns(config.Git.Clear.Ownership.Exclude.MessagePatterns, "git.clear.ownership.exclude.message_patterns"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateMessagePatterns(patterns []string, field string) error {
+	for _, pattern := range patterns {
+		if _, err := regexp.Compile(pattern); err != nil {
+			return fmt.Errorf("invalid %s regex %q: %w", field, pattern, err)
+		}
+	}
+
+	return nil
 }
 
 func (config Config) ResolveProjectByDir(dir string) *projects.Project {
@@ -141,6 +196,7 @@ func LoadConfig() (*Config, error) {
 	content, err := os.ReadFile(*configPath)
 	if err != nil {
 		config := emptyConfig()
+		config.Normalize()
 		err = SaveConfig(config)
 		if err != nil {
 			return nil, err
@@ -154,10 +210,20 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	config.Normalize()
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
 	return config, nil
 }
 
 func SaveConfig(config Config) error {
+	config.Normalize()
+	if err := config.Validate(); err != nil {
+		return err
+	}
+
 	configPath, err := getConfigPath()
 	if err != nil {
 		return err

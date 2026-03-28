@@ -3,6 +3,7 @@ package vcs
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -85,6 +86,115 @@ type RelatedBranch struct {
 	Status             BranchStatus
 }
 
+type BranchOwnershipFilterInput struct {
+	AuthorEmails    []string
+	AuthorNames     []string
+	MessagePatterns []string
+}
+
+type BranchOwnershipFilter struct {
+	authorEmails    map[string]struct{}
+	authorNames     map[string]struct{}
+	messagePatterns []*regexp.Regexp
+}
+
+type BranchOwnershipOptions struct {
+	LookbackCommits int
+	Include         BranchOwnershipFilter
+	Exclude         BranchOwnershipFilter
+}
+
+func NewBranchOwnershipOptions(lookbackCommits int, include BranchOwnershipFilterInput, exclude BranchOwnershipFilterInput) (BranchOwnershipOptions, error) {
+	compiledInclude, err := compileBranchOwnershipFilter(include)
+	if err != nil {
+		return BranchOwnershipOptions{}, err
+	}
+
+	compiledExclude, err := compileBranchOwnershipFilter(exclude)
+	if err != nil {
+		return BranchOwnershipOptions{}, err
+	}
+
+	if lookbackCommits <= 0 {
+		lookbackCommits = 3
+	}
+
+	return BranchOwnershipOptions{
+		LookbackCommits: lookbackCommits,
+		Include:         compiledInclude,
+		Exclude:         compiledExclude,
+	}, nil
+}
+
+func compileBranchOwnershipFilter(input BranchOwnershipFilterInput) (BranchOwnershipFilter, error) {
+	filter := BranchOwnershipFilter{
+		authorEmails:    make(map[string]struct{}, len(input.AuthorEmails)),
+		authorNames:     make(map[string]struct{}, len(input.AuthorNames)),
+		messagePatterns: make([]*regexp.Regexp, 0, len(input.MessagePatterns)),
+	}
+
+	for _, email := range input.AuthorEmails {
+		if email == "" {
+			continue
+		}
+		filter.authorEmails[email] = struct{}{}
+	}
+
+	for _, name := range input.AuthorNames {
+		if name == "" {
+			continue
+		}
+		filter.authorNames[name] = struct{}{}
+	}
+
+	for _, pattern := range input.MessagePatterns {
+		if pattern == "" {
+			continue
+		}
+		compiled, err := regexp.Compile(pattern)
+		if err != nil {
+			return BranchOwnershipFilter{}, fmt.Errorf("invalid ownership message regex %q: %w", pattern, err)
+		}
+		filter.messagePatterns = append(filter.messagePatterns, compiled)
+	}
+
+	return filter, nil
+}
+
+func (filter BranchOwnershipFilter) HasRules() bool {
+	return len(filter.authorEmails) > 0 || len(filter.authorNames) > 0 || len(filter.messagePatterns) > 0
+}
+
+func (filter BranchOwnershipFilter) MatchCommit(commit *object.Commit) bool {
+	if len(filter.authorEmails) > 0 {
+		if _, ok := filter.authorEmails[commit.Author.Email]; ok {
+			return true
+		}
+	}
+
+	if len(filter.authorNames) > 0 {
+		if _, ok := filter.authorNames[commit.Author.Name]; ok {
+			return true
+		}
+	}
+
+	for _, pattern := range filter.messagePatterns {
+		if pattern.MatchString(commit.Message) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (options BranchOwnershipOptions) HasIncludeRules() bool {
+	return options.Include.HasRules()
+}
+
+func (options BranchOwnershipOptions) HasExcludeRules() bool {
+	return options.Exclude.HasRules()
+}
+
 func (projectGit *ProjectGit) Fetch() error {
 	err := projectGit.repository.Fetch(&git.FetchOptions{RemoteName: "origin", Prune: true})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
@@ -93,7 +203,7 @@ func (projectGit *ProjectGit) Fetch() error {
 	return nil
 }
 
-func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
+func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]Branch, error) {
 	user := projectGit.ResolveUser()
 
 	local, err := projectGit.getLocalBranches()
@@ -149,7 +259,7 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 				author = "you"
 			}
 
-			ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user)
+			ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user, ownership)
 			if err != nil {
 				return nil, err
 			}
@@ -177,7 +287,7 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			author = "you"
 		}
 
-		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(localRef.hash, user)
+		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(localRef.hash, user, ownership)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +318,7 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 			author = "you"
 		}
 
-		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user)
+		ownedByCurrentUser, err := projectGit.isBranchOwnedByUser(remoteRef.hash, user, ownership)
 		if err != nil {
 			return nil, err
 		}
@@ -227,27 +337,82 @@ func (projectGit *ProjectGit) ListBranches() ([]Branch, error) {
 	return result, nil
 }
 
-func (projectGit *ProjectGit) isBranchOwnedByUser(branchHash plumbing.Hash, user User) (bool, error) {
-	commit, err := projectGit.repository.CommitObject(branchHash)
+func (projectGit *ProjectGit) isBranchOwnedByUser(branchHash plumbing.Hash, user User, ownership BranchOwnershipOptions) (bool, error) {
+	commits, err := projectGit.listBranchCommits(branchHash, ownership.LookbackCommits)
 	if err != nil {
 		return false, err
 	}
 
-	isOwnedByUser := false
-	depth := 0
-	err = commit.Parents().ForEach(func(commit *object.Commit) error {
-		if depth > 2 || isOwnedByUser {
-			return nil
+	return ownership.MatchCommits(commits, user), nil
+}
+
+func (options BranchOwnershipOptions) MatchCommits(commits []*object.Commit, user User) bool {
+	included := false
+	useFallbackUser := !options.HasIncludeRules()
+
+	for _, commit := range commits {
+		if options.HasExcludeRules() && options.Exclude.MatchCommit(commit) {
+			return false
 		}
 
-		isOwnedByUser = user.Match(commit.Author)
+		if options.HasIncludeRules() {
+			if options.Include.MatchCommit(commit) {
+				included = true
+			}
+			continue
+		}
 
-		depth++
+		if useFallbackUser && user.Match(commit.Author) {
+			included = true
+		}
+	}
 
-		return nil
-	})
+	return included
+}
 
-	return isOwnedByUser, err
+func (projectGit *ProjectGit) listBranchCommits(branchHash plumbing.Hash, limit int) ([]*object.Commit, error) {
+	if limit <= 0 {
+		limit = 3
+	}
+
+	start, err := projectGit.repository.CommitObject(branchHash)
+	if err != nil {
+		return nil, err
+	}
+
+	commits := make([]*object.Commit, 0, limit)
+	seen := map[plumbing.Hash]struct{}{}
+	stack := []*object.Commit{start}
+
+	for len(stack) > 0 && len(commits) < limit {
+		n := len(stack) - 1
+		commit := stack[n]
+		stack = stack[:n]
+
+		if _, ok := seen[commit.Hash]; ok {
+			continue
+		}
+		seen[commit.Hash] = struct{}{}
+		commits = append(commits, commit)
+
+		parents := make([]*object.Commit, 0, commit.NumParents())
+		err := commit.Parents().ForEach(func(parent *object.Commit) error {
+			parents = append(parents, parent)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for index := len(parents) - 1; index >= 0; index-- {
+			if _, ok := seen[parents[index].Hash]; ok {
+				continue
+			}
+			stack = append(stack, parents[index])
+		}
+	}
+
+	return commits, nil
 }
 
 type branchRef struct {

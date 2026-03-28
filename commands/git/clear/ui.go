@@ -97,7 +97,7 @@ func newUi(branches []projects.StaleBranch, projectGit *vcs.ProjectGit) ui {
 
 	status := "Press d to delete the selected branch locally and remotely."
 	if len(branches) == 0 {
-		status = "No branches found for the current git user."
+		status = "No branches found for the configured ownership filters."
 	}
 
 	return ui{
@@ -173,7 +173,7 @@ func (model ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (model ui) View() tea.View {
 	header := titleStyle.Render("ws git clear")
-	subtitle := subtitleStyle.Render("Branches owned by the current git user from branch history")
+	subtitle := subtitleStyle.Render("Branches matched by ownership filters from branch history")
 
 	statusStyle := statusInfoStyle
 	if model.statusErr {

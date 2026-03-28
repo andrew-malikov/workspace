@@ -17,7 +17,7 @@ func NewCommand() *cli.Command {
 	return &cli.Command{
 		Name:    "clear",
 		Aliases: []string{"clr", "c"},
-		Usage:   "clear branches owned by the current git user based on branch history",
+		Usage:   "clear branches matched by configured ownership filters from branch history",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			config, err := cfg.LoadConfig()
 			if err != nil {
@@ -41,7 +41,24 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			branches, err := project.ListStaleBranches(false)
+			ownership, err := vcs.NewBranchOwnershipOptions(
+				config.Git.Clear.Ownership.LookbackCommits,
+				vcs.BranchOwnershipFilterInput{
+					AuthorEmails:    config.Git.Clear.Ownership.Include.AuthorEmails,
+					AuthorNames:     config.Git.Clear.Ownership.Include.AuthorNames,
+					MessagePatterns: config.Git.Clear.Ownership.Include.MessagePatterns,
+				},
+				vcs.BranchOwnershipFilterInput{
+					AuthorEmails:    config.Git.Clear.Ownership.Exclude.AuthorEmails,
+					AuthorNames:     config.Git.Clear.Ownership.Exclude.AuthorNames,
+					MessagePatterns: config.Git.Clear.Ownership.Exclude.MessagePatterns,
+				},
+			)
+			if err != nil {
+				return err
+			}
+
+			branches, err := project.ListStaleBranches(false, ownership)
 			if err != nil {
 				return err
 			}
