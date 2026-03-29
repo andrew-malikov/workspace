@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/andrew-malikov/workspace/dotnet"
 	flr "github.com/andrew-malikov/workspace/failure"
 	projects "github.com/andrew-malikov/workspace/projects"
 
@@ -137,9 +138,11 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 		project.ResetMigrations()
 	}
 
-	if err := project.ApplyDiscoveredTests(config.Test); err != nil {
+	discoveredTests, err := dotnet.DiscoverTests(project.Dir, config.Test)
+	if err != nil {
 		return nil, err
 	}
+	project.Test = discoveredTests
 
 	result.HasUnitTests = project.Test.Unit.IsConfigured()
 	result.HasIntegrationTests = project.Test.Integration.IsConfigured()

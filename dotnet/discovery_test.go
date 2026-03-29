@@ -1,4 +1,4 @@
-package projects
+package dotnet
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/andrew-malikov/workspace/projects"
 )
 
 func TestDiscoverTestsMatchesConfiguredKinds(t *testing.T) {
@@ -14,15 +16,14 @@ func TestDiscoverTestsMatchesConfiguredKinds(t *testing.T) {
 	writeTestProject(t, dir, "tests/Orders.IntegrationTests/Orders.IntegrationTests.csproj")
 	writeTestProject(t, dir, "src/Orders/Orders.csproj")
 
-	project := Project{Alias: "orders", Dir: dir}
-	matches, err := project.DiscoverTests(TestDiscoveryConfig{
-		Unit: TestDiscoveryTarget{
+	got, err := DiscoverTests(dir, projects.TestDiscoveryConfig{
+		Unit: projects.TestDiscoveryTarget{
 			ProjectPatterns: []string{"(^|/)tests/.+UnitTests\\.csproj$"},
 		},
-		Integration: TestDiscoveryTarget{
+		Integration: projects.TestDiscoveryTarget{
 			ProjectPatterns: []string{"(^|/)tests/.+IntegrationTests\\.csproj$"},
 		},
-		Component: TestDiscoveryTarget{
+		Component: projects.TestDiscoveryTarget{
 			ProjectPatterns: []string{"(^|/)tests/.+ComponentTests\\.csproj$"},
 		},
 	})
@@ -30,12 +31,31 @@ func TestDiscoverTestsMatchesConfiguredKinds(t *testing.T) {
 		t.Fatalf("discover tests: %v", err)
 	}
 
-	want := map[TestKind]string{
-		UnitTestKind:        "tests/Orders.UnitTests/Orders.UnitTests.csproj",
-		IntegrationTestKind: "tests/Orders.IntegrationTests/Orders.IntegrationTests.csproj",
+	want := projects.TestConfig{
+		Unit:        projects.TestTarget{Project: "tests/Orders.UnitTests/Orders.UnitTests.csproj"},
+		Integration: projects.TestTarget{Project: "tests/Orders.IntegrationTests/Orders.IntegrationTests.csproj"},
 	}
-	if !reflect.DeepEqual(matches, want) {
-		t.Fatalf("unexpected matches: got %v want %v", matches, want)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected matches: got %+v want %+v", got, want)
+	}
+}
+
+func TestDiscoverTestsCopiesFilterToResolvedTarget(t *testing.T) {
+	dir := t.TempDir()
+	writeTestProject(t, dir, "tests/Orders.UnitTests/Orders.UnitTests.csproj")
+
+	got, err := DiscoverTests(dir, projects.TestDiscoveryConfig{
+		Unit: projects.TestDiscoveryTarget{
+			ProjectPatterns: []string{"(^|/)tests/.+UnitTests\\.csproj$"},
+			Filter:          "Category=Unit",
+		},
+	})
+	if err != nil {
+		t.Fatalf("discover tests: %v", err)
+	}
+
+	if got.Unit.Filter != "Category=Unit" {
+		t.Fatalf("unexpected filter: %s", got.Unit.Filter)
 	}
 }
 
@@ -44,9 +64,8 @@ func TestDiscoverTestsFailsOnMultipleMatches(t *testing.T) {
 	writeTestProject(t, dir, "tests/Orders.ComponentTests/Orders.ComponentTests.csproj")
 	writeTestProject(t, dir, "tests/Orders.ComponentTests/Orders.Api.ComponentTests.csproj")
 
-	project := Project{Alias: "orders", Dir: dir}
-	_, err := project.DiscoverTests(TestDiscoveryConfig{
-		Component: TestDiscoveryTarget{
+	_, err := DiscoverTests(dir, projects.TestDiscoveryConfig{
+		Component: projects.TestDiscoveryTarget{
 			ProjectPatterns: []string{"(^|/)tests/.+ComponentTests\\.csproj$"},
 		},
 	})
