@@ -50,7 +50,7 @@ func newBubbleStyles() bubbleStyles {
 			Padding(0, 1).
 			MarginBottom(1),
 		selectedBubble: lipgloss.NewStyle().
-			Border(lipgloss.ThickBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("81")).
 			Padding(0, 1).
 			MarginBottom(1),
