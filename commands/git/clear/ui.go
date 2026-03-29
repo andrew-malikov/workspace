@@ -172,7 +172,7 @@ func (model ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (model ui) View() tea.View {
-	header := titleStyle.Render("ws git clear")
+	header := titleStyle.Render("ws clear")
 	subtitle := subtitleStyle.Render("Branches matched by ownership filters from branch history")
 
 	statusStyle := statusInfoStyle

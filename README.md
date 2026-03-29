@@ -59,7 +59,7 @@ It would check whether any other compose is up (across tracked ones) and down it
 Lots of people make lots of code and thus lots of stale branches (me too by the way). Prints the stale branches to clean up (only branches owned by the current git user based on branch history):
 
 ```bash
-ws git cleanup --dry-run
+ws clear
 ```
 
 ```md
@@ -74,7 +74,7 @@ ws git cleanup --dry-run
 You can count your teammates:
 
 ```bash
-ws git cleanup --dry-run --team
+ws clear
 ```
 
 ```md
@@ -86,10 +86,10 @@ ws git cleanup --dry-run --team
 | [x] | hotfix/your-pc   | mr. anderson | 2021-01-01 00:00 AM | local  |
 ```
 
-Running without `--dry` forces the show up plan first for you to review and then if you're okay execute:
+Running the command opens an interactive UI for review first, then lets you delete the selected branches:
 
 ```bash
-ws git cleanup
+ws clear
 ```
 
 The good part it spit out when the last commit was made and who's the author, which makes easier to communicate whether the branch is indeed stale.

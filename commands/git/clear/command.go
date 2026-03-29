@@ -17,7 +17,7 @@ func NewCommand() *cli.Command {
 	return &cli.Command{
 		Name:    "clear",
 		Aliases: []string{"clr", "c"},
-		Usage:   "clear branches matched by configured ownership filters from branch history",
+		Usage:   "clear stale branches matched by configured ownership filters from branch history",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			config, err := cfg.LoadConfig()
 			if err != nil {

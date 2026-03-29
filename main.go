@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/andrew-malikov/workspace/commands/git"
+	"github.com/andrew-malikov/workspace/commands/git/clear"
 	"github.com/andrew-malikov/workspace/commands/track"
 	"github.com/andrew-malikov/workspace/commands/untrack"
 
@@ -19,7 +19,7 @@ func main() {
 		Commands: []*cli.Command{
 			track.NewCommand(),
 			untrack.NewCommand(),
-			git.NewCommand(),
+			clear.NewCommand(),
 		},
 	}
 
