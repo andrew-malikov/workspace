@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/andrew-malikov/workspace/commands/git/clear"
+	testcmd "github.com/andrew-malikov/workspace/commands/test"
 	"github.com/andrew-malikov/workspace/commands/track"
 	"github.com/andrew-malikov/workspace/commands/untrack"
 
@@ -14,10 +15,12 @@ import (
 
 func main() {
 	commands := &cli.Command{
-		Name:  "ws",
-		Usage: "workspace you way out",
+		Name:                   "ws",
+		Usage:                  "workspace you way out",
+		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			track.NewCommand(),
+			testcmd.NewCommand(),
 			untrack.NewCommand(),
 			clear.NewCommand(),
 		},

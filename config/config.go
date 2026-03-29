@@ -15,8 +15,9 @@ import (
 )
 
 type Config struct {
-	Projects map[string]projects.Project `toml:"projects"`
-	Git      GitConfig                   `toml:"git"`
+	Projects map[string]projects.Project  `toml:"projects"`
+	Git      GitConfig                    `toml:"git"`
+	Test     projects.TestDiscoveryConfig `toml:"test"`
 }
 
 type GitConfig struct {
@@ -65,10 +66,21 @@ func (config Config) Validate() error {
 		return err
 	}
 
+	for _, kind := range projects.AllTestKinds {
+		target := config.Test.Target(kind)
+		if err := validatePatterns(target.ProjectPatterns, fmt.Sprintf("test.%s.project_patterns", kind)); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 func validateMessagePatterns(patterns []string, field string) error {
+	return validatePatterns(patterns, field)
+}
+
+func validatePatterns(patterns []string, field string) error {
 	for _, pattern := range patterns {
 		if _, err := regexp.Compile(pattern); err != nil {
 			return fmt.Errorf("invalid %s regex %q: %w", field, pattern, err)
@@ -79,18 +91,27 @@ func validateMessagePatterns(patterns []string, field string) error {
 }
 
 func (config Config) ResolveProjectByDir(dir string) *projects.Project {
+	cleanDir := filepath.Clean(dir)
+	var matchedProject *projects.Project
 	for _, project := range config.Projects {
-		if strings.HasPrefix(project.Dir, dir) {
-			return &project
+		cleanProjectDir := filepath.Clean(project.Dir)
+		if cleanDir == cleanProjectDir || strings.HasPrefix(cleanDir, cleanProjectDir+string(os.PathSeparator)) {
+			current := project
+			if matchedProject == nil || len(current.Dir) > len(matchedProject.Dir) {
+				matchedProject = &current
+			}
 		}
 	}
 
-	return nil
+	return matchedProject
 }
 
 type AddProjectResult struct {
-	DoesComposeExist  bool
-	DoMigrationsExist bool
+	DoesComposeExist    bool
+	DoMigrationsExist   bool
+	HasUnitTests        bool
+	HasIntegrationTests bool
+	HasComponentTests   bool
 }
 
 func (config *Config) AddProject(project projects.Project) (*AddProjectResult, error) {
@@ -115,6 +136,14 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 	if !result.DoMigrationsExist {
 		project.ResetMigrations()
 	}
+
+	if err := project.ApplyDiscoveredTests(config.Test); err != nil {
+		return nil, err
+	}
+
+	result.HasUnitTests = project.Test.Unit.IsConfigured()
+	result.HasIntegrationTests = project.Test.Integration.IsConfigured()
+	result.HasComponentTests = project.Test.Component.IsConfigured()
 
 	if len(config.Projects) == 0 {
 		config.Projects = map[string]projects.Project{

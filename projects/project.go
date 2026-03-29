@@ -13,6 +13,7 @@ type Project struct {
 	Dir        string
 	Compose    *string
 	Migrations *string
+	Test       TestConfig `toml:"test"`
 }
 
 func (project Project) DoesComposeExist() bool {

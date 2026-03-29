@@ -49,10 +49,28 @@ Unit tests don't require any prior setup in opposite to the rest that do require
 OR you can use this one:
 
 ```bash
-ws tests [-a alias]
+ws test
+ws test -u
+ws test -ic
 ```
 
 It would check whether any other compose is up (across tracked ones) and down it.
+
+Configure global test discovery rules in `~/.config/ws/config.toml` and let `ws track` resolve the concrete test project paths for each tracked project:
+
+```toml
+[test.unit]
+project_patterns = ["(^|/)tests/.+UnitTests\\.csproj$"]
+filter = "Category=Unit"
+
+[test.integration]
+project_patterns = ["(^|/)tests/.+IntegrationTests\\.csproj$"]
+filter = "Category=Integration"
+
+[test.component]
+project_patterns = ["(^|/)tests/.+ComponentTests\\.csproj$"]
+filter = "Category=Component"
+```
 
 ## Git Cleanup
 

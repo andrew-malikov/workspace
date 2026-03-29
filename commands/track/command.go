@@ -101,10 +101,13 @@ func NewCommand() *cli.Command {
 			}
 
 			return view.Render(RESULT_TEMPLATE, view.Args{
-				"Alias":         project.Alias,
-				"Dir":           project.Dir,
-				"HasCompose":    result.DoesComposeExist,
-				"HasMigrations": result.DoMigrationsExist,
+				"Alias":               project.Alias,
+				"Dir":                 project.Dir,
+				"HasCompose":          result.DoesComposeExist,
+				"HasMigrations":       result.DoMigrationsExist,
+				"HasUnitTests":        result.HasUnitTests,
+				"HasIntegrationTests": result.HasIntegrationTests,
+				"HasComponentTests":   result.HasComponentTests,
 			})
 		},
 	}
@@ -114,5 +117,8 @@ var RESULT_TEMPLATE = template.Must(template.New("track_result").Parse(
 	`Project *{{.Alias}}* is tracked under **{{.Dir}}**
 
 * [{{if .HasCompose}}x{{else}} {{end}}] compose
-* [{{if .HasMigrations}}x{{else}} {{end}}] migrations`,
+* [{{if .HasMigrations}}x{{else}} {{end}}] migrations
+* [{{if .HasUnitTests}}x{{else}} {{end}}] unit tests
+* [{{if .HasIntegrationTests}}x{{else}} {{end}}] integration tests
+* [{{if .HasComponentTests}}x{{else}} {{end}}] component tests`,
 ))
