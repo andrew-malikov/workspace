@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/andrew-malikov/workspace/commands/containers"
 	"github.com/andrew-malikov/workspace/commands/git/clear"
 	"github.com/andrew-malikov/workspace/commands/scaffold"
 	test "github.com/andrew-malikov/workspace/commands/test"
@@ -23,6 +24,7 @@ func main() {
 			track.NewCommand(),
 			scaffold.NewCommand(),
 			test.NewCommand(),
+			containers.NewCommand(),
 			untrack.NewCommand(),
 			clear.NewCommand(),
 		},

@@ -5,6 +5,7 @@ No hassle DX to manage dozen of microservices at work.
 - [WS](#ws)
   - [Install](#install)
   - [Project Tracking](#project-tracking)
+  - [Running Containers](#running-containers)
   - [Run Tests](#run-tests)
   - [Git Cleanup](#git-cleanup)
   - [Worktrees and DB Migrations](#worktrees-and-db-migrations)
@@ -34,6 +35,14 @@ Remove already tracked directory from the tracker:
 
 ```bash
 ws untrack [directory | alias]
+```
+
+## Running Containers
+
+List tracked projects with currently running docker compose services:
+
+```bash
+ws ctrs
 ```
 
 ## Run Tests
@@ -79,38 +88,6 @@ Lots of people make lots of code and thus lots of stale branches (me too by the 
 ```bash
 ws clear
 ```
-
-```md
-| [ ] | branch           | author | updated at          | status |
-| --- | ---------------- | ------ | ------------------- | ------ |
-| [ ] | feat/glancy-list | you    | 2026-08-02 11:30 AM | synced |
-| [x] | feat/remove-me   | you    | 2026-02-01 14:15 PM | local  |
-| ... | ...              | ...    | ...                 | ...    |
-| [x] | story/mocks      | you    | 2024-31-12 23:59 PM | remote |
-```
-
-You can count your teammates:
-
-```bash
-ws clear
-```
-
-```md
-| [ ] | branch           | author       | updated at          | status |
-| --- | ---------------- | ------------ | ------------------- | ------ |
-| [ ] | feat/glancy-list | you          | 2026-08-02 11:30 AM | synced |
-| [x] | feat/remove-me   | you          | 2026-02-01 14:15 PM | local  |
-| ... | ...              | ...          | ...                 | ...    |
-| [x] | hotfix/your-pc   | mr. anderson | 2021-01-01 00:00 AM | local  |
-```
-
-Running the command opens an interactive UI for review first, then lets you delete the selected branches:
-
-```bash
-ws clear
-```
-
-The good part it spit out when the last commit was made and who's the author, which makes easier to communicate whether the branch is indeed stale.
 
 ## Worktrees and DB Migrations
 
