@@ -35,3 +35,6 @@ go.work.sum
 out
 binaries
 dist
+
+# opencode and co.
+.opencode

@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/andrew-malikov/workspace/commands/git/clear"
-	testcmd "github.com/andrew-malikov/workspace/commands/test"
+	test "github.com/andrew-malikov/workspace/commands/test"
 	"github.com/andrew-malikov/workspace/commands/track"
 	"github.com/andrew-malikov/workspace/commands/untrack"
 
@@ -20,7 +20,7 @@ func main() {
 		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			track.NewCommand(),
-			testcmd.NewCommand(),
+			test.NewCommand(),
 			untrack.NewCommand(),
 			clear.NewCommand(),
 		},

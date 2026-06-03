@@ -214,110 +214,13 @@ func (projectGit *ProjectGit) Fetch() error {
 func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]Branch, error) {
 	user := projectGit.ResolveUser()
 
-	local, err := projectGit.getLocalBranches()
-	if err != nil {
-		return nil, err
-	}
-	localByName := make(map[string]branchRef)
-	for _, branch := range local {
-		localByName[branch.name] = branch
-	}
-
 	remote, err := projectGit.getRemoteBranches()
 	if err != nil {
 		return nil, err
 	}
-	remoteByName := make(map[string]branchRef)
-	for _, branch := range remote {
-		remoteByName[branch.name] = branch
-	}
 
-	result := make([]Branch, 0, len(localByName)+len(remoteByName))
-	seenRemoteKeys := make(map[string]struct{})
-
-	for localName, localRef := range localByName {
-		remoteKey := localName
-		remoteRef, hasRemote := remoteByName[remoteKey]
-
-		var related *RelatedBranch
-		if hasRemote {
-			relation, relErr := projectGit.compareCommits(localRef.hash, remoteRef.hash)
-			if relErr != nil {
-				return nil, relErr
-			}
-			var status BranchStatus
-			switch relation {
-			case commitEqual:
-				status = SyncedBranch
-			case commitAhead:
-				status = AheadBranch
-			case commitBehind:
-				status = BehindBranch
-			case commitDiverged:
-				status = DivergedBranch
-			}
-
-			commit, err := projectGit.repository.CommitObject(remoteRef.hash)
-			if err != nil {
-				return nil, err
-			}
-
-			author := commit.Author.Name
-			if user.Match(commit.Author) {
-				author = "you"
-			}
-
-			ownershipResult, err := projectGit.resolveBranchOwnership(remoteRef.hash, user, ownership)
-			if err != nil {
-				return nil, err
-			}
-
-			related = &RelatedBranch{
-				Name:               remoteRef.name,
-				Hash:               remoteRef.hash,
-				Ref:                remoteRef.refName,
-				UpdatedAt:          commit.Author.When,
-				Author:             author,
-				OwnedByCurrentUser: ownershipResult.Matched,
-				MatchingCommits:    ownershipResult.Previews,
-				Remote:             &remoteRef.remote,
-				Status:             status,
-			}
-			seenRemoteKeys[remoteKey] = struct{}{}
-		}
-
-		commit, err := projectGit.repository.CommitObject(localRef.hash)
-		if err != nil {
-			return nil, err
-		}
-
-		author := commit.Author.Name
-		if user.Match(commit.Author) {
-			author = "you"
-		}
-
-		ownershipResult, err := projectGit.resolveBranchOwnership(localRef.hash, user, ownership)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, Branch{
-			Name:               localRef.name,
-			Hash:               localRef.hash,
-			Ref:                localRef.refName,
-			Author:             author,
-			OwnedByCurrentUser: ownershipResult.Matched,
-			MatchingCommits:    ownershipResult.Previews,
-			UpdatedAt:          commit.Author.When,
-			Related:            related,
-		})
-	}
-
-	for key, remoteRef := range remoteByName {
-		if _, seen := seenRemoteKeys[key]; seen {
-			continue
-		}
-
+	result := make([]Branch, 0, len(remote))
+	for _, remoteRef := range remote {
 		commit, err := projectGit.repository.CommitObject(remoteRef.hash)
 		if err != nil {
 			return nil, err
@@ -332,6 +235,7 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 		if err != nil {
 			return nil, err
 		}
+		remoteName := remoteRef.remote
 
 		result = append(result, Branch{
 			Name:               remoteRef.name,
@@ -341,7 +245,7 @@ func (projectGit *ProjectGit) ListBranches(ownership BranchOwnershipOptions) ([]
 			OwnedByCurrentUser: ownershipResult.Matched,
 			MatchingCommits:    ownershipResult.Previews,
 			UpdatedAt:          commit.Author.When,
-			Remote:             &remoteRef.remote,
+			Remote:             &remoteName,
 		})
 	}
 

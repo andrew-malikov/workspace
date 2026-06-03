@@ -83,6 +83,10 @@ func (project Project) ListStaleBranches(fetch bool, ownership vcs.BranchOwnersh
 		return nil, err
 	}
 
+	return staleBranches(branches), nil
+}
+
+func staleBranches(branches []vcs.Branch) []StaleBranch {
 	staleBranches := make([]StaleBranch, 0, len(branches))
 	for _, branch := range branches {
 		if branch.OwnedByCurrentUser || (branch.Related != nil && branch.Related.OwnedByCurrentUser) {
@@ -99,5 +103,5 @@ func (project Project) ListStaleBranches(fetch bool, ownership vcs.BranchOwnersh
 
 	}
 
-	return staleBranches, nil
+	return staleBranches
 }

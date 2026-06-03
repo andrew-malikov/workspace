@@ -95,7 +95,7 @@ func newUi(branches []projects.StaleBranch, projectGit *vcs.ProjectGit) ui {
 	helpModel := help.New()
 	helpModel.ShowAll = false
 
-	status := "Press d to delete the selected branch locally and remotely."
+	status := "Press d to delete the selected remote branch."
 	if len(branches) == 0 {
 		status = "No branches found for the configured ownership filters."
 	}
@@ -173,7 +173,7 @@ func (model ui) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (model ui) View() tea.View {
 	header := titleStyle.Render("ws clear")
-	subtitle := subtitleStyle.Render("Branches matched by ownership filters from branch history")
+	subtitle := subtitleStyle.Render("Found matching branches")
 
 	statusStyle := statusInfoStyle
 	if model.statusErr {
