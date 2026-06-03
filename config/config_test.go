@@ -153,3 +153,42 @@ func TestAddProjectCopiesDiscoveredTests(t *testing.T) {
 		t.Fatalf("unexpected filter: %s", stored.Test.Unit.Filter)
 	}
 }
+
+func TestScaffoldProjectTestsCopiesDiscoveredTestOptions(t *testing.T) {
+	dir := t.TempDir()
+	projectPath := filepath.Join(dir, "tests", "Orders.ComponentTests", "Orders.ComponentTests.csproj")
+	if err := os.MkdirAll(filepath.Dir(projectPath), 0o755); err != nil {
+		t.Fatalf("mkdir project dir: %v", err)
+	}
+	if err := os.WriteFile(projectPath, []byte("<Project />"), 0o644); err != nil {
+		t.Fatalf("write csproj: %v", err)
+	}
+
+	config := Config{
+		Test: projects.TestDiscoveryConfig{
+			Component: projects.TestDiscoveryTarget{
+				ProjectPatterns: []string{"(^|/)tests/.+ComponentTests\\.csproj$"},
+				Filter:          "Category=Component",
+			},
+		},
+	}
+	project := projects.Project{
+		Alias: "orders",
+		Dir:   dir,
+		Test: projects.TestConfig{
+			Component: projects.TestTarget{Project: "old.csproj", Filter: "Old"},
+		},
+	}
+
+	if err := config.ScaffoldProjectTests(&project); err != nil {
+		t.Fatalf("scaffold tests: %v", err)
+	}
+
+	if project.Test.Component.Project != "tests/Orders.ComponentTests/Orders.ComponentTests.csproj" {
+		t.Fatalf("unexpected project path: %s", project.Test.Component.Project)
+	}
+
+	if project.Test.Component.Filter != "Category=Component" {
+		t.Fatalf("unexpected filter: %s", project.Test.Component.Filter)
+	}
+}

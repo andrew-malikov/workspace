@@ -138,11 +138,9 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 		project.ResetMigrations()
 	}
 
-	discoveredTests, err := dotnet.DiscoverTests(project.Dir, config.Test)
-	if err != nil {
+	if err := config.ScaffoldProjectTests(&project); err != nil {
 		return nil, err
 	}
-	project.Test = discoveredTests
 
 	result.HasUnitTests = project.Test.Unit.IsConfigured()
 	result.HasIntegrationTests = project.Test.Integration.IsConfigured()
@@ -157,6 +155,16 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 	}
 
 	return &result, nil
+}
+
+func (config Config) ScaffoldProjectTests(project *projects.Project) error {
+	discoveredTests, err := dotnet.DiscoverTests(project.Dir, config.Test)
+	if err != nil {
+		return err
+	}
+
+	project.Test = discoveredTests
+	return nil
 }
 
 type NoProjectFound struct {

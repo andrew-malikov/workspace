@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/andrew-malikov/workspace/commands/git/clear"
+	"github.com/andrew-malikov/workspace/commands/scaffold"
 	test "github.com/andrew-malikov/workspace/commands/test"
 	"github.com/andrew-malikov/workspace/commands/track"
 	"github.com/andrew-malikov/workspace/commands/untrack"
@@ -20,6 +21,7 @@ func main() {
 		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
 			track.NewCommand(),
+			scaffold.NewCommand(),
 			test.NewCommand(),
 			untrack.NewCommand(),
 			clear.NewCommand(),
