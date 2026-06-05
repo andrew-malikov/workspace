@@ -7,6 +7,7 @@ import (
 
 	"github.com/andrew-malikov/workspace/commands/containers"
 	"github.com/andrew-malikov/workspace/commands/git/clear"
+	"github.com/andrew-malikov/workspace/commands/list"
 	"github.com/andrew-malikov/workspace/commands/scaffold"
 	test "github.com/andrew-malikov/workspace/commands/test"
 	"github.com/andrew-malikov/workspace/commands/track"
@@ -21,6 +22,7 @@ func main() {
 		Usage:                  "workspace you way out",
 		UseShortOptionHandling: true,
 		Commands: []*cli.Command{
+			list.NewCommand(),
 			track.NewCommand(),
 			scaffold.NewCommand(),
 			test.NewCommand(),
