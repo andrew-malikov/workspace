@@ -45,6 +45,24 @@ List tracked projects with currently running docker compose services:
 ws ctrs
 ```
 
+Start docker compose for the current tracked project:
+
+```bash
+ws up
+```
+
+Start docker compose for a tracked project by alias:
+
+```bash
+ws up <alias>
+```
+
+By default, `ws up` stops any other tracked project with running docker compose services before starting the target project. Use `--alongside` to keep other compose projects active:
+
+```bash
+ws up <alias> --alongside
+```
+
 ## Run Tests
 
 There are three types of tests

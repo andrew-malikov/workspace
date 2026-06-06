@@ -12,6 +12,7 @@ import (
 	test "github.com/andrew-malikov/workspace/commands/test"
 	"github.com/andrew-malikov/workspace/commands/track"
 	"github.com/andrew-malikov/workspace/commands/untrack"
+	"github.com/andrew-malikov/workspace/commands/up"
 
 	"github.com/urfave/cli/v3"
 )
@@ -24,6 +25,7 @@ func main() {
 		Commands: []*cli.Command{
 			list.NewCommand(),
 			track.NewCommand(),
+			up.NewCommand(),
 			scaffold.NewCommand(),
 			test.NewCommand(),
 			containers.NewCommand(),
