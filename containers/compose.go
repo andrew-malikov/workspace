@@ -10,6 +10,7 @@ type Compose interface {
 	HasRunning(ctx context.Context, dir string, compose string) (bool, error)
 	Up(ctx context.Context, dir string, compose string) error
 	Down(ctx context.Context, dir string, compose string) error
+	Cleanup(ctx context.Context, dir string, compose string) error
 }
 
 type DockerCompose struct{}
@@ -30,6 +31,11 @@ func (docker DockerCompose) Up(ctx context.Context, dir string, compose string) 
 
 func (docker DockerCompose) Down(ctx context.Context, dir string, compose string) error {
 	_, err := docker.run(ctx, dir, compose, "down")
+	return err
+}
+
+func (docker DockerCompose) Cleanup(ctx context.Context, dir string, compose string) error {
+	_, err := docker.run(ctx, dir, compose, "down", "-v")
 	return err
 }
 

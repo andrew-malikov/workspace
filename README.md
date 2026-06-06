@@ -63,6 +63,13 @@ By default, `ws up` stops any other tracked project with running docker compose 
 ws up <alias> --alongside
 ```
 
+Use `--blank` or `-b` to remove the target project's docker compose volumes before starting it:
+
+```bash
+ws up <alias> --blank
+ws up <alias> -b
+```
+
 ## Run Tests
 
 There are three types of tests

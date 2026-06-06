@@ -12,6 +12,7 @@ import (
 type UpProjectResult struct {
 	Alias     string
 	Alongside bool
+	Blank     bool
 	Stopped   []string
 }
 
@@ -31,7 +32,7 @@ func (workspace Workspace) ResolveProject(cwd string, alias string) (*projects.P
 	return nil, fmt.Errorf("project is not tracked: %s", alias)
 }
 
-func (workspace Workspace) UpProject(ctx context.Context, cwd string, alias string, alongside bool, compose containers.Compose) (*UpProjectResult, error) {
+func (workspace Workspace) UpProject(ctx context.Context, cwd string, alias string, alongside bool, blank bool, compose containers.Compose) (*UpProjectResult, error) {
 	target, err := workspace.ResolveProject(cwd, alias)
 	if err != nil {
 		return nil, err
@@ -64,11 +65,17 @@ func (workspace Workspace) UpProject(ctx context.Context, cwd string, alias stri
 		}
 	}
 
+	if blank {
+		if err := target.CleanupContainers(ctx, compose); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := target.UpContainers(ctx, compose); err != nil {
 		return nil, err
 	}
 
-	return &UpProjectResult{Alias: target.Alias, Alongside: alongside, Stopped: stopped}, nil
+	return &UpProjectResult{Alias: target.Alias, Alongside: alongside, Blank: blank, Stopped: stopped}, nil
 }
 
 func (workspace Workspace) DownProject(ctx context.Context, cwd string, alias string, compose containers.Compose) (*projects.Project, error) {

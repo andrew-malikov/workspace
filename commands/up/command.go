@@ -28,6 +28,11 @@ func NewCommand() *cli.Command {
 				Name:  "alongside",
 				Usage: "keep other running docker compose projects active",
 			},
+			&cli.BoolFlag{
+				Name:    "blank",
+				Aliases: []string{"b"},
+				Usage:   "cleanup target docker compose volumes before starting",
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			workspace, err := workspaces.LoadWorkspace()
@@ -40,7 +45,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			result, err := workspace.UpProject(ctx, dir, cmd.StringArg("alias"), cmd.Bool("alongside"), containers.DockerCompose{})
+			result, err := workspace.UpProject(ctx, dir, cmd.StringArg("alias"), cmd.Bool("alongside"), cmd.Bool("blank"), containers.DockerCompose{})
 			if err != nil {
 				return err
 			}
@@ -48,6 +53,7 @@ func NewCommand() *cli.Command {
 			return view.Render(RESULT_TEMPLATE, view.Args{
 				"Alias":     result.Alias,
 				"Alongside": result.Alongside,
+				"Blank":     result.Blank,
 				"Stopped":   strings.Join(result.Stopped, ", "),
 			})
 		},
@@ -56,6 +62,8 @@ func NewCommand() *cli.Command {
 
 var RESULT_TEMPLATE = template.Must(template.New("up_result").Parse(
 	`Project *{{.Alias}}* docker compose is up.
+{{if .Blank}}Target docker compose volumes were cleaned up before start.
+{{end}}
 {{if .Alongside}}Other running docker compose projects left active.
 {{else}}{{if .Stopped}}Stopped running docker compose projects: {{.Stopped}}.
 {{else}}No other running docker compose projects found.
