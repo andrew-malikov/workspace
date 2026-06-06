@@ -12,7 +12,7 @@ import (
 )
 
 func RunTest(ctx context.Context, dir string, kind projects.TestKind, target projects.TestTarget) error {
-	args := []string{"test", target.Project}
+	args := []string{"test"}
 	if strings.TrimSpace(target.Filter) != "" {
 		args = append(args, "--filter", target.Filter)
 	}
