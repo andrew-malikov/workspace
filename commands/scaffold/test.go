@@ -7,9 +7,9 @@ import (
 	"strings"
 	"text/template"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/projects"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
@@ -25,22 +25,22 @@ func newTestCommand() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
 
-			project, err := resolveProject(config, cmd.StringArg("directory_or_alias"))
+			project, err := resolveProject(workspace, cmd.StringArg("directory_or_alias"))
 			if err != nil {
 				return err
 			}
 
-			if err := config.ScaffoldProjectTests(project); err != nil {
+			if err := workspace.ScaffoldProjectTests(project); err != nil {
 				return err
 			}
 
-			config.Projects[project.Alias] = *project
-			if err := cfg.SaveConfig(*config); err != nil {
+			workspace.Projects[project.Alias] = *project
+			if err := workspaces.SaveWorkspace(*workspace); err != nil {
 				return err
 			}
 
@@ -54,20 +54,20 @@ func newTestCommand() *cli.Command {
 	}
 }
 
-func resolveProject(config *cfg.Config, alsdir string) (*projects.Project, error) {
+func resolveProject(workspace *workspaces.Workspace, alsdir string) (*projects.Project, error) {
 	if strings.TrimSpace(alsdir) == "" {
 		dir, err := os.Getwd()
 		if err != nil {
 			return nil, err
 		}
-		return resolveProject(config, dir)
+		return resolveProject(workspace, dir)
 	}
 
-	if project, ok := config.Projects[alsdir]; ok {
+	if project, ok := workspace.Projects[alsdir]; ok {
 		return &project, nil
 	}
 
-	project := config.ResolveProjectByDir(alsdir)
+	project := workspace.ResolveProjectByDir(alsdir)
 	if project != nil {
 		return project, nil
 	}

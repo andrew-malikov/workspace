@@ -6,9 +6,9 @@ import (
 	"strings"
 	"text/template"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/projects"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
@@ -26,13 +26,13 @@ func NewCommand() *cli.Command {
 		Aliases: []string{"ls"},
 		Usage:   "list tracked projects",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
 
 			return view.Render(RESULT_TEMPLATE, view.Args{
-				"Projects": buildListedProjects(config.Projects),
+				"Projects": buildListedProjects(workspace.Projects),
 			})
 		},
 	}

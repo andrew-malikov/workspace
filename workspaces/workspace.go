@@ -1,4 +1,4 @@
-package cfg
+package workspaces
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-type Config struct {
+type Workspace struct {
 	Projects map[string]projects.Project  `toml:"projects"`
 	Git      GitConfig                    `toml:"git"`
 	Test     projects.TestDiscoveryConfig `toml:"test"`
@@ -41,34 +41,34 @@ type GitClearOwnershipFilterConfig struct {
 	MessagePatterns []string `toml:"message_patterns"`
 }
 
-func emptyConfig() Config {
-	return Config{
+func emptyWorkspace() Workspace {
+	return Workspace{
 		Projects: map[string]projects.Project{},
 		Git:      GitConfig{},
 	}
 }
 
-func (config *Config) Normalize() {
-	if config.Projects == nil {
-		config.Projects = map[string]projects.Project{}
+func (workspace *Workspace) Normalize() {
+	if workspace.Projects == nil {
+		workspace.Projects = map[string]projects.Project{}
 	}
 
-	if config.Git.Clear.Ownership.LookbackCommits <= 0 {
-		config.Git.Clear.Ownership.LookbackCommits = 3
+	if workspace.Git.Clear.Ownership.LookbackCommits <= 0 {
+		workspace.Git.Clear.Ownership.LookbackCommits = 3
 	}
 }
 
-func (config Config) Validate() error {
-	if err := validateMessagePatterns(config.Git.Clear.Ownership.Include.MessagePatterns, "git.clear.ownership.include.message_patterns"); err != nil {
+func (workspace Workspace) Validate() error {
+	if err := validateMessagePatterns(workspace.Git.Clear.Ownership.Include.MessagePatterns, "git.clear.ownership.include.message_patterns"); err != nil {
 		return err
 	}
 
-	if err := validateMessagePatterns(config.Git.Clear.Ownership.Exclude.MessagePatterns, "git.clear.ownership.exclude.message_patterns"); err != nil {
+	if err := validateMessagePatterns(workspace.Git.Clear.Ownership.Exclude.MessagePatterns, "git.clear.ownership.exclude.message_patterns"); err != nil {
 		return err
 	}
 
 	for _, kind := range projects.AllTestKinds {
-		target := config.Test.Target(kind)
+		target := workspace.Test.Target(kind)
 		if err := validatePatterns(target.ProjectPatterns, fmt.Sprintf("test.%s.project_patterns", kind)); err != nil {
 			return err
 		}
@@ -91,10 +91,10 @@ func validatePatterns(patterns []string, field string) error {
 	return nil
 }
 
-func (config Config) ResolveProjectByDir(dir string) *projects.Project {
+func (workspace Workspace) ResolveProjectByDir(dir string) *projects.Project {
 	cleanDir := filepath.Clean(dir)
 	var matchedProject *projects.Project
-	for _, project := range config.Projects {
+	for _, project := range workspace.Projects {
 		cleanProjectDir := filepath.Clean(project.Dir)
 		if cleanDir == cleanProjectDir || strings.HasPrefix(cleanDir, cleanProjectDir+string(os.PathSeparator)) {
 			current := project
@@ -115,8 +115,8 @@ type AddProjectResult struct {
 	HasComponentTests   bool
 }
 
-func (config *Config) AddProject(project projects.Project) (*AddProjectResult, error) {
-	for _, existingProject := range config.Projects {
+func (workspace *Workspace) AddProject(project projects.Project) (*AddProjectResult, error) {
+	for _, existingProject := range workspace.Projects {
 		if existingProject.Alias == project.Alias {
 			return nil, fmt.Errorf("a project with such alias %s already exist at %s", project.Alias, existingProject.Dir)
 		}
@@ -138,7 +138,7 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 		project.ResetMigrations()
 	}
 
-	if err := config.ScaffoldProjectTests(&project); err != nil {
+	if err := workspace.ScaffoldProjectTests(&project); err != nil {
 		return nil, err
 	}
 
@@ -146,19 +146,19 @@ func (config *Config) AddProject(project projects.Project) (*AddProjectResult, e
 	result.HasIntegrationTests = project.Test.Integration.IsConfigured()
 	result.HasComponentTests = project.Test.Component.IsConfigured()
 
-	if len(config.Projects) == 0 {
-		config.Projects = map[string]projects.Project{
+	if len(workspace.Projects) == 0 {
+		workspace.Projects = map[string]projects.Project{
 			project.Alias: project,
 		}
 	} else {
-		config.Projects[project.Alias] = project
+		workspace.Projects[project.Alias] = project
 	}
 
 	return &result, nil
 }
 
-func (config Config) ScaffoldProjectTests(project *projects.Project) error {
-	discoveredTests, err := dotnet.DiscoverTests(project.Dir, config.Test)
+func (workspace Workspace) ScaffoldProjectTests(project *projects.Project) error {
+	discoveredTests, err := dotnet.DiscoverTests(project.Dir, workspace.Test)
 	if err != nil {
 		return err
 	}
@@ -171,9 +171,9 @@ type NoProjectFound struct {
 	Alsdir string
 }
 
-func (config *Config) RemoveProject(alsdir string) (*projects.Project, *flr.Failure) {
+func (workspace *Workspace) RemoveProject(alsdir string) (*projects.Project, *flr.Failure) {
 	var foundProject *projects.Project
-	for _, project := range config.Projects {
+	for _, project := range workspace.Projects {
 		if project.Alias == alsdir || strings.HasPrefix(alsdir, project.Dir) {
 			foundProject = &project
 			break
@@ -192,7 +192,7 @@ func (config *Config) RemoveProject(alsdir string) (*projects.Project, *flr.Fail
 		)
 	}
 
-	delete(config.Projects, foundProject.Alias)
+	delete(workspace.Projects, foundProject.Alias)
 
 	return foundProject, nil
 }
@@ -227,7 +227,7 @@ func getConfigPath() (*string, error) {
 	return &path, nil
 }
 
-func LoadConfig() (*Config, error) {
+func LoadWorkspace() (*Workspace, error) {
 	configPath, err := getConfigPath()
 	if err != nil {
 		return nil, err
@@ -235,32 +235,32 @@ func LoadConfig() (*Config, error) {
 
 	content, err := os.ReadFile(*configPath)
 	if err != nil {
-		config := emptyConfig()
-		config.Normalize()
-		err = SaveConfig(config)
+		workspace := emptyWorkspace()
+		workspace.Normalize()
+		err = SaveWorkspace(workspace)
 		if err != nil {
 			return nil, err
 		}
-		return &config, nil
+		return &workspace, nil
 	}
 
-	var config *Config
-	err = toml.Unmarshal(content, &config)
+	var workspace *Workspace
+	err = toml.Unmarshal(content, &workspace)
 	if err != nil {
 		return nil, err
 	}
 
-	config.Normalize()
-	if err := config.Validate(); err != nil {
+	workspace.Normalize()
+	if err := workspace.Validate(); err != nil {
 		return nil, err
 	}
 
-	return config, nil
+	return workspace, nil
 }
 
-func SaveConfig(config Config) error {
-	config.Normalize()
-	if err := config.Validate(); err != nil {
+func SaveWorkspace(workspace Workspace) error {
+	workspace.Normalize()
+	if err := workspace.Validate(); err != nil {
 		return err
 	}
 
@@ -268,7 +268,7 @@ func SaveConfig(config Config) error {
 	if err != nil {
 		return err
 	}
-	content, err := toml.Marshal(config)
+	content, err := toml.Marshal(workspace)
 	if err != nil {
 		return err
 	}

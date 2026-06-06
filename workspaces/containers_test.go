@@ -1,4 +1,4 @@
-package up
+package workspaces
 
 import (
 	"context"
@@ -8,19 +8,44 @@ import (
 	"strings"
 	"testing"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/projects"
 )
 
+type composeCall struct {
+	Action  string
+	Dir     string
+	Compose string
+}
+
+type composeSpy struct {
+	running map[string]bool
+	calls   []composeCall
+}
+
+func (spy *composeSpy) HasRunning(ctx context.Context, dir string, compose string) (bool, error) {
+	spy.calls = append(spy.calls, composeCall{Action: "ps", Dir: dir, Compose: compose})
+	return spy.running[dir], nil
+}
+
+func (spy *composeSpy) Up(ctx context.Context, dir string, compose string) error {
+	spy.calls = append(spy.calls, composeCall{Action: "up", Dir: dir, Compose: compose})
+	return nil
+}
+
+func (spy *composeSpy) Down(ctx context.Context, dir string, compose string) error {
+	spy.calls = append(spy.calls, composeCall{Action: "down", Dir: dir, Compose: compose})
+	return nil
+}
+
 func TestResolveProjectDefaultsToCurrentDirectory(t *testing.T) {
 	dir := filepath.Join(string(os.PathSeparator), "tmp", "orders")
-	config := &cfg.Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{
 			"orders": {Alias: "orders", Dir: dir},
 		},
 	}
 
-	project, err := resolveProject(config, filepath.Join(dir, "src"), "")
+	project, err := workspace.ResolveProject(filepath.Join(dir, "src"), "")
 	if err != nil {
 		t.Fatalf("resolve project: %v", err)
 	}
@@ -31,13 +56,13 @@ func TestResolveProjectDefaultsToCurrentDirectory(t *testing.T) {
 }
 
 func TestResolveProjectMatchesAlias(t *testing.T) {
-	config := &cfg.Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{
 			"orders": {Alias: "orders", Dir: filepath.Join(string(os.PathSeparator), "tmp", "orders")},
 		},
 	}
 
-	project, err := resolveProject(config, "/tmp/other", "orders")
+	project, err := workspace.ResolveProject("/tmp/other", "orders")
 	if err != nil {
 		t.Fatalf("resolve project: %v", err)
 	}
@@ -51,23 +76,15 @@ func TestUpProjectStopsOtherRunningComposeByDefault(t *testing.T) {
 	targetDir := trackedProjectDir(t)
 	otherDir := trackedProjectDir(t)
 	compose := "docker-compose.yaml"
-	config := &cfg.Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{
 			"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
 			"billing": {Alias: "billing", Dir: otherDir, Compose: &compose},
 		},
 	}
-	calls := []string{}
+	composeSpy := &composeSpy{running: map[string]bool{otherDir: true}}
 
-	result, err := upProject(context.Background(), config, targetDir, "", false, func(ctx context.Context, project projects.Project) (bool, error) {
-		return project.Alias == "billing", nil
-	}, func(ctx context.Context, project projects.Project) error {
-		calls = append(calls, "up:"+project.Alias)
-		return nil
-	}, func(ctx context.Context, project projects.Project) error {
-		calls = append(calls, "down:"+project.Alias)
-		return nil
-	})
+	result, err := workspace.UpProject(context.Background(), targetDir, "", false, composeSpy)
 	if err != nil {
 		t.Fatalf("up project: %v", err)
 	}
@@ -78,8 +95,13 @@ func TestUpProjectStopsOtherRunningComposeByDefault(t *testing.T) {
 	if !slices.Equal(result.Stopped, []string{"billing"}) {
 		t.Fatalf("unexpected stopped projects: %v", result.Stopped)
 	}
-	if !slices.Equal(calls, []string{"down:billing", "up:orders"}) {
-		t.Fatalf("unexpected calls: %v", calls)
+	expectedCalls := []composeCall{
+		{Action: "ps", Dir: otherDir, Compose: compose},
+		{Action: "down", Dir: otherDir, Compose: compose},
+		{Action: "up", Dir: targetDir, Compose: compose},
+	}
+	if !slices.Equal(composeSpy.calls, expectedCalls) {
+		t.Fatalf("unexpected calls: %v", composeSpy.calls)
 	}
 }
 
@@ -87,24 +109,15 @@ func TestUpProjectAlongsideKeepsOtherRunningCompose(t *testing.T) {
 	targetDir := trackedProjectDir(t)
 	otherDir := trackedProjectDir(t)
 	compose := "docker-compose.yaml"
-	config := &cfg.Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{
 			"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
 			"billing": {Alias: "billing", Dir: otherDir, Compose: &compose},
 		},
 	}
-	calls := []string{}
+	composeSpy := &composeSpy{running: map[string]bool{otherDir: true}}
 
-	result, err := upProject(context.Background(), config, targetDir, "", true, func(ctx context.Context, project projects.Project) (bool, error) {
-		t.Fatal("should not check running projects with --alongside")
-		return false, nil
-	}, func(ctx context.Context, project projects.Project) error {
-		calls = append(calls, "up:"+project.Alias)
-		return nil
-	}, func(ctx context.Context, project projects.Project) error {
-		calls = append(calls, "down:"+project.Alias)
-		return nil
-	})
+	result, err := workspace.UpProject(context.Background(), targetDir, "", true, composeSpy)
 	if err != nil {
 		t.Fatalf("up project: %v", err)
 	}
@@ -112,25 +125,30 @@ func TestUpProjectAlongsideKeepsOtherRunningCompose(t *testing.T) {
 	if len(result.Stopped) != 0 {
 		t.Fatalf("unexpected stopped projects: %v", result.Stopped)
 	}
-	if !slices.Equal(calls, []string{"up:orders"}) {
-		t.Fatalf("unexpected calls: %v", calls)
+	expectedCalls := []composeCall{{Action: "up", Dir: targetDir, Compose: compose}}
+	if !slices.Equal(composeSpy.calls, expectedCalls) {
+		t.Fatalf("unexpected calls: %v", composeSpy.calls)
 	}
 }
 
 func TestUpProjectFailsWhenComposeMissing(t *testing.T) {
 	dir := t.TempDir()
-	config := &cfg.Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{
 			"orders": {Alias: "orders", Dir: dir},
 		},
 	}
 
-	_, err := upProject(context.Background(), config, dir, "", false, nil, nil, nil)
+	composeSpy := &composeSpy{}
+	_, err := workspace.UpProject(context.Background(), dir, "", false, composeSpy)
 	if err == nil {
 		t.Fatal("expected compose error")
 	}
 	if !strings.Contains(err.Error(), "no docker compose configured for project orders") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(composeSpy.calls) != 0 {
+		t.Fatalf("unexpected calls: %v", composeSpy.calls)
 	}
 }
 

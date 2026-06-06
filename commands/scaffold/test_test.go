@@ -6,18 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/projects"
+	"github.com/andrew-malikov/workspace/workspaces"
 )
 
 func TestResolveProjectMatchesAlias(t *testing.T) {
-	config := &cfg.Config{
+	workspace := &workspaces.Workspace{
 		Projects: map[string]projects.Project{
 			"orders": {Alias: "orders", Dir: filepath.Join(string(os.PathSeparator), "tmp", "orders")},
 		},
 	}
 
-	project, err := resolveProject(config, "orders")
+	project, err := resolveProject(workspace, "orders")
 	if err != nil {
 		t.Fatalf("resolve project: %v", err)
 	}
@@ -29,13 +29,13 @@ func TestResolveProjectMatchesAlias(t *testing.T) {
 
 func TestResolveProjectMatchesDirectory(t *testing.T) {
 	dir := filepath.Join(string(os.PathSeparator), "tmp", "orders")
-	config := &cfg.Config{
+	workspace := &workspaces.Workspace{
 		Projects: map[string]projects.Project{
 			"orders": {Alias: "orders", Dir: dir},
 		},
 	}
 
-	project, err := resolveProject(config, filepath.Join(dir, "src"))
+	project, err := resolveProject(workspace, filepath.Join(dir, "src"))
 	if err != nil {
 		t.Fatalf("resolve project: %v", err)
 	}
@@ -46,9 +46,9 @@ func TestResolveProjectMatchesDirectory(t *testing.T) {
 }
 
 func TestResolveProjectFailsForUntrackedInput(t *testing.T) {
-	config := &cfg.Config{Projects: map[string]projects.Project{}}
+	workspace := &workspaces.Workspace{Projects: map[string]projects.Project{}}
 
-	_, err := resolveProject(config, "missing")
+	_, err := resolveProject(workspace, "missing")
 	if err == nil {
 		t.Fatal("expected untracked project error")
 	}

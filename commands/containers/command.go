@@ -6,8 +6,9 @@ import (
 	"sort"
 	"text/template"
 
-	cfg "github.com/andrew-malikov/workspace/config"
+	"github.com/andrew-malikov/workspace/containers"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
@@ -24,14 +25,15 @@ func NewCommand() *cli.Command {
 		Aliases: []string{"ctrs"},
 		Usage:   "list projects with running docker compose services",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
 
-			running := make([]runningProject, 0, len(config.Projects))
-			for _, project := range config.Projects {
-				hasRunning, err := project.HasRunningContainers(ctx)
+			compose := containers.DockerCompose{}
+			running := make([]runningProject, 0, len(workspace.Projects))
+			for _, project := range workspace.Projects {
+				hasRunning, err := project.HasRunningContainers(ctx, compose)
 				if err != nil {
 					return err
 				}

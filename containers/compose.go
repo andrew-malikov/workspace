@@ -6,23 +6,34 @@ import (
 	"strings"
 )
 
-type Runner func(ctx context.Context, dir string, compose string) ([]byte, error)
-
-func DockerCompose(ctx context.Context, dir string, compose string) ([]byte, error) {
-	return RunDockerCompose(ctx, dir, compose, "ps", "--status", "running", "--format", "json")
+type Compose interface {
+	HasRunning(ctx context.Context, dir string, compose string) (bool, error)
+	Up(ctx context.Context, dir string, compose string) error
+	Down(ctx context.Context, dir string, compose string) error
 }
 
-func DockerComposeUp(ctx context.Context, dir string, compose string) error {
-	_, err := RunDockerCompose(ctx, dir, compose, "up", "-d")
+type DockerCompose struct{}
+
+func (docker DockerCompose) HasRunning(ctx context.Context, dir string, compose string) (bool, error) {
+	out, err := docker.run(ctx, dir, compose, "ps", "--status", "running", "--format", "json")
+	if err != nil {
+		return false, err
+	}
+
+	return HasRunning(out), nil
+}
+
+func (docker DockerCompose) Up(ctx context.Context, dir string, compose string) error {
+	_, err := docker.run(ctx, dir, compose, "up", "-d")
 	return err
 }
 
-func DockerComposeDown(ctx context.Context, dir string, compose string) error {
-	_, err := RunDockerCompose(ctx, dir, compose, "down")
+func (docker DockerCompose) Down(ctx context.Context, dir string, compose string) error {
+	_, err := docker.run(ctx, dir, compose, "down")
 	return err
 }
 
-func RunDockerCompose(ctx context.Context, dir string, compose string, args ...string) ([]byte, error) {
+func (docker DockerCompose) run(ctx context.Context, dir string, compose string, args ...string) ([]byte, error) {
 	commandArgs := append([]string{"compose", "-f", compose}, args...)
 	command := exec.CommandContext(ctx, "docker", commandArgs...)
 	command.Dir = dir

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/dotnet"
 	"github.com/andrew-malikov/workspace/projects"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
@@ -37,7 +37,7 @@ func NewCommand() *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
@@ -47,7 +47,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			project := config.ResolveProjectByDir(dir)
+			project := workspace.ResolveProjectByDir(dir)
 			if project == nil {
 				return view.RenderDirectoryIsNotTrackedYet(dir)
 			}

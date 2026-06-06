@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/vcs"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 
@@ -19,7 +19,7 @@ func NewCommand() *cli.Command {
 		Aliases: []string{"clr", "c"},
 		Usage:   "clear stale branches matched by configured ownership filters from branch history",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
@@ -29,7 +29,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			project := config.ResolveProjectByDir(dir)
+			project := workspace.ResolveProjectByDir(dir)
 
 			// todo: use the wd as a draft project instead of exiting
 			if project == nil {
@@ -42,16 +42,16 @@ func NewCommand() *cli.Command {
 			}
 
 			ownership, err := vcs.NewBranchOwnershipOptions(
-				config.Git.Clear.Ownership.LookbackCommits,
+				workspace.Git.Clear.Ownership.LookbackCommits,
 				vcs.BranchOwnershipFilterInput{
-					AuthorEmails:    config.Git.Clear.Ownership.Include.AuthorEmails,
-					AuthorNames:     config.Git.Clear.Ownership.Include.AuthorNames,
-					MessagePatterns: config.Git.Clear.Ownership.Include.MessagePatterns,
+					AuthorEmails:    workspace.Git.Clear.Ownership.Include.AuthorEmails,
+					AuthorNames:     workspace.Git.Clear.Ownership.Include.AuthorNames,
+					MessagePatterns: workspace.Git.Clear.Ownership.Include.MessagePatterns,
 				},
 				vcs.BranchOwnershipFilterInput{
-					AuthorEmails:    config.Git.Clear.Ownership.Exclude.AuthorEmails,
-					AuthorNames:     config.Git.Clear.Ownership.Exclude.AuthorNames,
-					MessagePatterns: config.Git.Clear.Ownership.Exclude.MessagePatterns,
+					AuthorEmails:    workspace.Git.Clear.Ownership.Exclude.AuthorEmails,
+					AuthorNames:     workspace.Git.Clear.Ownership.Exclude.AuthorNames,
+					MessagePatterns: workspace.Git.Clear.Ownership.Exclude.MessagePatterns,
 				},
 			)
 			if err != nil {

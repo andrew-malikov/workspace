@@ -1,4 +1,4 @@
-package cfg
+package workspaces
 
 import (
 	"os"
@@ -9,7 +9,7 @@ import (
 	"github.com/andrew-malikov/workspace/projects"
 )
 
-func TestLoadConfigNormalizesOwnershipLookback(t *testing.T) {
+func TestLoadWorkspaceNormalizesOwnershipLookback(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", ".config")
@@ -24,17 +24,17 @@ func TestLoadConfigNormalizesOwnershipLookback(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	config, err := LoadConfig()
+	workspace, err := LoadWorkspace()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
 
-	if config.Git.Clear.Ownership.LookbackCommits != 3 {
-		t.Fatalf("expected default lookback 3, got %d", config.Git.Clear.Ownership.LookbackCommits)
+	if workspace.Git.Clear.Ownership.LookbackCommits != 3 {
+		t.Fatalf("expected default lookback 3, got %d", workspace.Git.Clear.Ownership.LookbackCommits)
 	}
 }
 
-func TestLoadConfigRejectsInvalidOwnershipRegex(t *testing.T) {
+func TestLoadWorkspaceRejectsInvalidOwnershipRegex(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", ".config")
@@ -52,7 +52,7 @@ func TestLoadConfigRejectsInvalidOwnershipRegex(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, err := LoadConfig()
+	_, err := LoadWorkspace()
 	if err == nil {
 		t.Fatal("expected invalid regex error")
 	}
@@ -62,7 +62,7 @@ func TestLoadConfigRejectsInvalidOwnershipRegex(t *testing.T) {
 	}
 }
 
-func TestLoadConfigRejectsInvalidTestRegex(t *testing.T) {
+func TestLoadWorkspaceRejectsInvalidTestRegex(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", ".config")
@@ -80,7 +80,7 @@ func TestLoadConfigRejectsInvalidTestRegex(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, err := LoadConfig()
+	_, err := LoadWorkspace()
 	if err == nil {
 		t.Fatal("expected invalid regex error")
 	}
@@ -91,7 +91,7 @@ func TestLoadConfigRejectsInvalidTestRegex(t *testing.T) {
 }
 
 func TestResolveProjectByDirMatchesNestedDirectory(t *testing.T) {
-	config := Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{
 			"orders": {
 				Alias: "orders",
@@ -100,7 +100,7 @@ func TestResolveProjectByDirMatchesNestedDirectory(t *testing.T) {
 		},
 	}
 
-	project := config.ResolveProjectByDir(filepath.Join(string(os.PathSeparator), "tmp", "orders", "src"))
+	project := workspace.ResolveProjectByDir(filepath.Join(string(os.PathSeparator), "tmp", "orders", "src"))
 	if project == nil {
 		t.Fatal("expected project to resolve")
 	}
@@ -109,7 +109,7 @@ func TestResolveProjectByDirMatchesNestedDirectory(t *testing.T) {
 		t.Fatalf("unexpected project alias: %s", project.Alias)
 	}
 
-	project = config.ResolveProjectByDir(filepath.Join(string(os.PathSeparator), "tmp", "orders-api"))
+	project = workspace.ResolveProjectByDir(filepath.Join(string(os.PathSeparator), "tmp", "orders-api"))
 	if project != nil {
 		t.Fatalf("expected no match for sibling directory, got %s", project.Alias)
 	}
@@ -125,7 +125,7 @@ func TestAddProjectCopiesDiscoveredTests(t *testing.T) {
 		t.Fatalf("write csproj: %v", err)
 	}
 
-	config := Config{
+	workspace := Workspace{
 		Projects: map[string]projects.Project{},
 		Test: projects.TestDiscoveryConfig{
 			Unit: projects.TestDiscoveryTarget{
@@ -135,7 +135,7 @@ func TestAddProjectCopiesDiscoveredTests(t *testing.T) {
 		},
 	}
 
-	result, err := config.AddProject(projects.Project{Alias: "orders", Dir: dir})
+	result, err := workspace.AddProject(projects.Project{Alias: "orders", Dir: dir})
 	if err != nil {
 		t.Fatalf("add project: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestAddProjectCopiesDiscoveredTests(t *testing.T) {
 		t.Fatal("expected unit tests to be detected")
 	}
 
-	stored := config.Projects["orders"]
+	stored := workspace.Projects["orders"]
 	if stored.Test.Unit.Project != "tests/Orders.UnitTests/Orders.UnitTests.csproj" {
 		t.Fatalf("unexpected project path: %s", stored.Test.Unit.Project)
 	}
@@ -164,7 +164,7 @@ func TestScaffoldProjectTestsCopiesDiscoveredTestOptions(t *testing.T) {
 		t.Fatalf("write csproj: %v", err)
 	}
 
-	config := Config{
+	workspace := Workspace{
 		Test: projects.TestDiscoveryConfig{
 			Component: projects.TestDiscoveryTarget{
 				ProjectPatterns: []string{"(^|/)tests/.+ComponentTests\\.csproj$"},
@@ -180,7 +180,7 @@ func TestScaffoldProjectTestsCopiesDiscoveredTestOptions(t *testing.T) {
 		},
 	}
 
-	if err := config.ScaffoldProjectTests(&project); err != nil {
+	if err := workspace.ScaffoldProjectTests(&project); err != nil {
 		t.Fatalf("scaffold tests: %v", err)
 	}
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"text/template"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	flr "github.com/andrew-malikov/workspace/failure"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
@@ -42,17 +42,17 @@ func NewCommand() *cli.Command {
 				}
 			}
 
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
 
-			removedProject, failure := config.RemoveProject(alsdir)
+			removedProject, failure := workspace.RemoveProject(alsdir)
 			if failure != nil {
 				return renderFailure(*failure)
 			}
 
-			err = cfg.SaveConfig(*config)
+			err = workspaces.SaveWorkspace(*workspace)
 			if err != nil {
 				return renderFailure(*flr.OfError(err))
 			}
@@ -69,7 +69,7 @@ func renderFailure(failure flr.Failure) error {
 	if failure.Context == nil {
 		return failure.Error
 	}
-	if ctx, matched := flr.Is[cfg.NoProjectFound]("NO_PROJECT_FOUND", failure); matched {
+	if ctx, matched := flr.Is[workspaces.NoProjectFound]("NO_PROJECT_FOUND", failure); matched {
 		return view.Render(FAILURE_PROJECT_NOT_FOUND, view.Args{
 			"Alsdir": ctx.Alsdir,
 		})

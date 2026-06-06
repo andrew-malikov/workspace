@@ -6,9 +6,9 @@ import (
 	"strings"
 	"text/template"
 
-	cfg "github.com/andrew-malikov/workspace/config"
 	"github.com/andrew-malikov/workspace/projects"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
@@ -85,17 +85,17 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			config, err := cfg.LoadConfig()
+			workspace, err := workspaces.LoadWorkspace()
 			if err != nil {
 				return err
 			}
 
-			result, err := config.AddProject(*project)
+			result, err := workspace.AddProject(*project)
 			if err != nil {
 				return err
 			}
 
-			err = cfg.SaveConfig(*config)
+			err = workspaces.SaveWorkspace(*workspace)
 			if err != nil {
 				return err
 			}
