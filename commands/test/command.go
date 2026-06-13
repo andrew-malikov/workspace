@@ -1,4 +1,4 @@
-package testcmd
+package test
 
 import (
 	"context"
@@ -61,13 +61,15 @@ func NewCommand() *cli.Command {
 				return fmt.Errorf("no tests are configured for project %s", project.Alias)
 			}
 
+			// todo: keep the data mapping here and move all the logic into project module
+			testRunner := dotnet.NewTestRunner(dotnet.StdCommandRunner{})
 			for _, kind := range requestedKinds {
 				target := project.Test.Target(kind)
 				if !target.IsConfigured() {
 					return fmt.Errorf("%s tests are not configured for project %s", kind, project.Alias)
 				}
 
-				if err := dotnet.RunTest(ctx, project.Dir, kind, target); err != nil {
+				if err := testRunner.Run(ctx, project.Dir, kind, target); err != nil {
 					return err
 				}
 			}
