@@ -56,7 +56,8 @@ func listProjects(root string) ([]string, error) {
 			return nil
 		}
 
-		if filepath.Ext(path) != ".csproj" {
+		ext := filepath.Ext(path)
+		if ext != ".csproj" && ext != ".fsproj" {
 			return nil
 		}
 

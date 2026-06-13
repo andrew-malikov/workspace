@@ -45,6 +45,20 @@ func emptyWorkspace() Workspace {
 	return Workspace{
 		Projects: map[string]projects.Project{},
 		Git:      GitConfig{},
+		Test: projects.TestDiscoveryConfig{
+			Unit: projects.TestDiscoveryTarget{
+				ProjectPatterns: []string{".+UnitTests\\.[cf]sproj"},
+				Filter:          "FullyQualifiedName~UnitTests",
+			},
+			Integration: projects.TestDiscoveryTarget{
+				ProjectPatterns: []string{".+IntegrationTests\\.[cf]sproj"},
+				Filter:          "FullyQualifiedName~IntegrationTests",
+			},
+			Component: projects.TestDiscoveryTarget{
+				ProjectPatterns: []string{".+ComponentTests\\.[cf]sproj"},
+				Filter:          "FullyQualifiedName~ComponentTests",
+			},
+		},
 	}
 }
 
