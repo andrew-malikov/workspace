@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/andrew-malikov/workspace/dotnet"
-	flr "github.com/andrew-malikov/workspace/failure"
 	projects "github.com/andrew-malikov/workspace/projects"
 
 	"github.com/BurntSushi/toml"
@@ -185,7 +184,19 @@ type NoProjectFound struct {
 	Alsdir string
 }
 
-func (workspace *Workspace) RemoveProject(alsdir string) (*projects.Project, *flr.Failure) {
+func (failure NoProjectFound) Error() string {
+	return fmt.Sprintf("no project is found by %s", failure.Alsdir)
+}
+
+type DirectoryNotTrackedError struct {
+	Dir string
+}
+
+func (failure DirectoryNotTrackedError) Error() string {
+	return fmt.Sprintf("current directory %s isn't tracked yet", failure.Dir)
+}
+
+func (workspace *Workspace) RemoveProject(alsdir string) (*projects.Project, error) {
 	var foundProject *projects.Project
 	for _, project := range workspace.Projects {
 		if project.Alias == alsdir || strings.HasPrefix(alsdir, project.Dir) {
@@ -195,15 +206,7 @@ func (workspace *Workspace) RemoveProject(alsdir string) (*projects.Project, *fl
 	}
 
 	if foundProject == nil {
-		return nil, flr.OfCtx(
-			flr.Context{
-				// todo: definitely MUST be a constant
-				Type: "NO_PROJECT_FOUND",
-				Details: &NoProjectFound{
-					Alsdir: alsdir,
-				},
-			},
-		)
+		return nil, NoProjectFound{Alsdir: alsdir}
 	}
 
 	delete(workspace.Projects, foundProject.Alias)

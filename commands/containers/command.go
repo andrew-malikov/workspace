@@ -19,7 +19,7 @@ type runningProject struct {
 	Compose string
 }
 
-func NewCommand() *cli.Command {
+func NewCommand(renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:    "containers",
 		Aliases: []string{"ctrs"},
@@ -51,17 +51,17 @@ func NewCommand() *cli.Command {
 				return running[i].Alias < running[j].Alias
 			})
 
-			return view.Render(RESULT_TEMPLATE, view.Args{
+			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Projects": running,
 			})
 		},
 	}
 }
 
-var RESULT_TEMPLATE = template.Must(template.New("containers_result").Parse(
+var RESULT_TEMPLATE = template.Must(template.New("containers_result").Funcs(view.TemplateFuncs).Parse(
 	`{{if .Projects}}| alias | directory | compose |
 | --- | --- | --- |
-{{range .Projects}}| {{.Alias}} | {{.Dir}} | {{.Compose}} |
+{{range .Projects}}| {{.Alias | tableCell}} | {{.Dir | tableCell}} | {{.Compose | tableCell}} |
 {{end}}{{else}}No running docker compose projects found.
 {{end}}`,
 ))

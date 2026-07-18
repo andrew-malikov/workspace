@@ -3,7 +3,7 @@ package dotnet
 import (
 	"context"
 	"fmt"
-	"os"
+	"io"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -15,14 +15,18 @@ type CommandRunner interface {
 	Exec(ctx context.Context, dir string, executable string, args []string) error
 }
 
-type StdCommandRunner struct{}
+type StdCommandRunner struct {
+	Input  io.Reader
+	Output io.Writer
+	Error  io.Writer
+}
 
 func (runner StdCommandRunner) Exec(ctx context.Context, dir string, executable string, args []string) error {
 	command := exec.CommandContext(ctx, executable, args...)
 	command.Dir = dir
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	command.Stdin = os.Stdin
+	command.Stdout = runner.Output
+	command.Stderr = runner.Error
+	command.Stdin = runner.Input
 
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("executable %s failed: %w", executable, err)
@@ -33,10 +37,11 @@ func (runner StdCommandRunner) Exec(ctx context.Context, dir string, executable 
 
 type TestRunner struct {
 	commandRunner CommandRunner
+	diagnostics   io.Writer
 }
 
-func NewTestRunner(commandRunner CommandRunner) TestRunner {
-	return TestRunner{commandRunner: commandRunner}
+func NewTestRunner(commandRunner CommandRunner, diagnostics io.Writer) TestRunner {
+	return TestRunner{commandRunner: commandRunner, diagnostics: diagnostics}
 }
 
 func (runner TestRunner) Run(ctx context.Context, dir string, kind projects.TestKind, target projects.TestTarget) error {
@@ -45,9 +50,9 @@ func (runner TestRunner) Run(ctx context.Context, dir string, kind projects.Test
 		args = append(args, "--filter", target.Filter)
 	}
 
-	fmt.Printf("----- %s -----\n", kind)
-	fmt.Printf("dotnet %s\n", formatCommand(args))
-
+	if _, err := fmt.Fprintf(runner.diagnostics, "----- %s -----\ndotnet %s\n", kind, formatCommand(args)); err != nil {
+		return err
+	}
 	return runner.commandRunner.Exec(ctx, dir, "dotnet", args)
 }
 

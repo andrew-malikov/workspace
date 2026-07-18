@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/andrew-malikov/workspace/console"
 	"github.com/andrew-malikov/workspace/dotnet"
 	"github.com/andrew-malikov/workspace/projects"
-	"github.com/andrew-malikov/workspace/view"
 	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(terminal console.Console) *cli.Command {
 	return &cli.Command{
 		Name:                   "test",
 		Aliases:                []string{"t"},
@@ -49,7 +49,7 @@ func NewCommand() *cli.Command {
 
 			project := workspace.ResolveProjectByDir(dir)
 			if project == nil {
-				return view.RenderDirectoryIsNotTrackedYet(dir)
+				return workspaces.DirectoryNotTrackedError{Dir: dir}
 			}
 
 			requestedKinds := resolveRequestedKinds(cmd.Bool(string(projects.UnitTestKind)), cmd.Bool(string(projects.IntegrationTestKind)), cmd.Bool(string(projects.ComponentTestKind)))
@@ -62,7 +62,11 @@ func NewCommand() *cli.Command {
 			}
 
 			// todo: keep the data mapping here and move all the logic into project module
-			testRunner := dotnet.NewTestRunner(dotnet.StdCommandRunner{})
+			testRunner := dotnet.NewTestRunner(dotnet.StdCommandRunner{
+				Input:  terminal.Input,
+				Output: terminal.Output,
+				Error:  terminal.Error,
+			}, terminal.Error)
 			for _, kind := range requestedKinds {
 				target := project.Test.Target(kind)
 				if !target.IsConfigured() {

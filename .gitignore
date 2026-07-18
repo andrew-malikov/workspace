@@ -38,6 +38,6 @@ dist
 
 # opencode and co.
 .opencode
+.omp
+.pi
 
-# graphify
-graphify-out

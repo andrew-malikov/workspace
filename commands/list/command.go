@@ -20,7 +20,7 @@ type listedProject struct {
 	sortOrder string
 }
 
-func NewCommand() *cli.Command {
+func NewCommand(renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:    "list",
 		Aliases: []string{"ls"},
@@ -31,7 +31,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			return view.Render(RESULT_TEMPLATE, view.Args{
+			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Projects": buildListedProjects(workspace.Projects),
 			})
 		},
@@ -79,10 +79,10 @@ func enabledSummary(project projects.Project) string {
 	return strings.Join(enabled, ", ")
 }
 
-var RESULT_TEMPLATE = template.Must(template.New("list_result").Parse(
+var RESULT_TEMPLATE = template.Must(template.New("list_result").Funcs(view.TemplateFuncs).Parse(
 	`{{if .Projects}}| name | directory | enabled |
 | --- | --- | --- |
-{{range .Projects}}| {{.Name}} | {{.Dir}} | {{.Enabled}} |
+{{range .Projects}}| {{.Name | tableCell}} | {{.Dir | tableCell}} | {{.Enabled | tableCell}} |
 {{end}}{{else}}No tracked projects found.
 {{end}}`,
 ))

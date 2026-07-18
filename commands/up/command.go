@@ -13,7 +13,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:  "up",
 		Usage: "start project docker compose",
@@ -50,7 +50,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			return view.Render(RESULT_TEMPLATE, view.Args{
+			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Alias":     result.Alias,
 				"Alongside": result.Alongside,
 				"Blank":     result.Blank,
@@ -60,12 +60,12 @@ func NewCommand() *cli.Command {
 	}
 }
 
-var RESULT_TEMPLATE = template.Must(template.New("up_result").Parse(
-	`Project *{{.Alias}}* docker compose is up.
+var RESULT_TEMPLATE = template.Must(template.New("up_result").Funcs(view.TemplateFuncs).Parse(
+	`Project *{{.Alias | literal}}* docker compose is up.
 {{if .Blank}}Target docker compose volumes were cleaned up before start.
 {{end}}
 {{if .Alongside}}Other running docker compose projects left active.
-{{else}}{{if .Stopped}}Stopped running docker compose projects: {{.Stopped}}.
+{{else}}{{if .Stopped}}Stopped running docker compose projects: {{.Stopped | literal}}.
 {{else}}No other running docker compose projects found.
 {{end}}{{end}}`,
 ))

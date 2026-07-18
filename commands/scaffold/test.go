@@ -14,7 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func newTestCommand() *cli.Command {
+func newTestCommand(renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:  "test",
 		Usage: "copy global test options into a tracked project",
@@ -44,7 +44,7 @@ func newTestCommand() *cli.Command {
 				return err
 			}
 
-			return view.Render(TEST_RESULT_TEMPLATE, view.Args{
+			return renderer.Render(TEST_RESULT_TEMPLATE, view.Args{
 				"Alias":               project.Alias,
 				"HasUnitTests":        project.Test.Unit.IsConfigured(),
 				"HasIntegrationTests": project.Test.Integration.IsConfigured(),
@@ -75,8 +75,8 @@ func resolveProject(workspace *workspaces.Workspace, alsdir string) (*projects.P
 	return nil, fmt.Errorf("project is not tracked: %s", alsdir)
 }
 
-var TEST_RESULT_TEMPLATE = template.Must(template.New("scaffold_test_result").Parse(
-	`Project *{{.Alias}}* test config scaffolded
+var TEST_RESULT_TEMPLATE = template.Must(template.New("scaffold_test_result").Funcs(view.TemplateFuncs).Parse(
+	`Project *{{.Alias | literal}}* test config scaffolded
 
 * [{{if .HasUnitTests}}x{{else}} {{end}}] unit tests
 * [{{if .HasIntegrationTests}}x{{else}} {{end}}] integration tests

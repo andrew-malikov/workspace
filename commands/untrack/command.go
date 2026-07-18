@@ -6,14 +6,13 @@ import (
 	"strings"
 	"text/template"
 
-	flr "github.com/andrew-malikov/workspace/failure"
 	"github.com/andrew-malikov/workspace/view"
 	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
 
-func NewCommand() *cli.Command {
+func NewCommand(renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:    "untrack",
 		Aliases: []string{"remove", "untr"},
@@ -35,11 +34,11 @@ func NewCommand() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			alsdir := cmd.StringArg("alsdir")
 			if strings.TrimSpace(alsdir) == "" {
-				if wd, err := os.Getwd(); err != nil {
-					return renderFailure(*flr.OfError(err))
-				} else {
-					alsdir = wd
+				wd, err := os.Getwd()
+				if err != nil {
+					return err
 				}
+				alsdir = wd
 			}
 
 			workspace, err := workspaces.LoadWorkspace()
@@ -47,17 +46,16 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			removedProject, failure := workspace.RemoveProject(alsdir)
-			if failure != nil {
-				return renderFailure(*failure)
-			}
-
-			err = workspaces.SaveWorkspace(*workspace)
+			removedProject, err := workspace.RemoveProject(alsdir)
 			if err != nil {
-				return renderFailure(*flr.OfError(err))
+				return err
 			}
 
-			return view.Render(RESULT_TEMPLATE, view.Args{
+			if err := workspaces.SaveWorkspace(*workspace); err != nil {
+				return err
+			}
+
+			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Alias": removedProject.Alias,
 				"Dir":   removedProject.Dir,
 			})
@@ -65,22 +63,6 @@ func NewCommand() *cli.Command {
 	}
 }
 
-func renderFailure(failure flr.Failure) error {
-	if failure.Context == nil {
-		return failure.Error
-	}
-	if ctx, matched := flr.Is[workspaces.NoProjectFound]("NO_PROJECT_FOUND", failure); matched {
-		return view.Render(FAILURE_PROJECT_NOT_FOUND, view.Args{
-			"Alsdir": ctx.Alsdir,
-		})
-	}
-	return view.RenderUnhandledFailure(*failure.Context)
-}
-
-var FAILURE_PROJECT_NOT_FOUND = template.Must(template.New("untrack_project_not_found").Parse(
-	`No project is found by **{{.Alsdir}}**`,
-))
-
-var RESULT_TEMPLATE = template.Must(template.New("untrack_result").Parse(
-	`Project *{{.Alias}}* under **{{.Dir}}** is no longer tracked`,
+var RESULT_TEMPLATE = template.Must(template.New("untrack_result").Funcs(view.TemplateFuncs).Parse(
+	`Project *{{.Alias | literal}}* under **{{.Dir | literal}}** is no longer tracked`,
 ))

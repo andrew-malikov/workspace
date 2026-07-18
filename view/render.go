@@ -3,45 +3,128 @@ package view
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
 	"text/template"
-
-	flr "github.com/andrew-malikov/workspace/failure"
+	"unicode"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/styles"
 )
 
 type Args = map[string]any
 
-func Render(tmpl *template.Template, data Args) error {
-	var buf bytes.Buffer
-	tmpl.Execute(&buf, data)
+type Renderer struct {
+	writer   io.Writer
+	rich     bool
+	renderer *glamour.TermRenderer
+}
 
-	out, err := glamour.Render(buf.String(), "dark")
+func NewRenderer(writer io.Writer, rich bool) (*Renderer, error) {
+	result := &Renderer{writer: writer, rich: rich}
+	if !rich {
+		return result, nil
+	}
+
+	renderer, err := newTermRenderer("dark", 80)
 	if err != nil {
+		return nil, err
+	}
+	result.renderer = renderer
+	return result, nil
+}
+
+func newTermRenderer(style string, wordWrap int) (*glamour.TermRenderer, error) {
+	return glamour.NewTermRenderer(
+		glamour.WithStandardStyle(style),
+		glamour.WithWordWrap(wordWrap),
+		glamour.WithPreservedNewLines(),
+	)
+}
+
+func newPlainRenderer(wordWrap int) (*glamour.TermRenderer, error) {
+	style := styles.NoTTYStyleConfig
+	noMargin := uint(0)
+	style.Document.Margin = &noMargin
+	style.CodeBlock.Margin = &noMargin
+	return glamour.NewTermRenderer(
+		glamour.WithStyles(style),
+		glamour.WithWordWrap(wordWrap),
+		glamour.WithPreservedNewLines(),
+	)
+}
+
+func (renderer *Renderer) Render(tmpl *template.Template, data Args) error {
+	var markdown bytes.Buffer
+	if err := tmpl.Execute(&markdown, data); err != nil {
 		return err
 	}
 
-	fmt.Print(out)
-	return nil
+	termRenderer := renderer.renderer
+	if !renderer.rich {
+		var err error
+		termRenderer, err = newPlainRenderer(markdownWidth(markdown.String()))
+		if err != nil {
+			return err
+		}
+	}
+
+	out, err := termRenderer.Render(markdown.String())
+	if err != nil {
+		return err
+	}
+	if !renderer.rich {
+		lines := strings.Split(out, "\n")
+		for index := range lines {
+			lines[index] = strings.TrimRight(lines[index], " \t")
+		}
+		out = strings.Join(lines, "\n")
+	}
+	_, err = io.WriteString(renderer.writer, out)
+	return err
 }
 
-var UNHANDLED_FAILURE_TEMPLATE = template.Must(template.New("unhandled_failure").Parse(
-	// todo: show up the data along the way as json HA_HA_HA
-	`Unhandler failure is found **{{.Type}}**`,
-))
-
-func RenderUnhandledFailure(ctx flr.Context) error {
-	return Render(UNHANDLED_FAILURE_TEMPLATE, Args{
-		"Type": ctx.Type,
-	})
+func markdownWidth(markdown string) int {
+	width := 1
+	for line := range strings.SplitSeq(markdown, "\n") {
+		if len(line) > width {
+			width = len(line)
+		}
+	}
+	return width
 }
 
-var DIRECTORY_IS_NOT_TRACKED_YET = template.Must(template.New("directory_is_untracked").Parse(
-	`Current directory **{{.Dir}}** isn't tracked yet`,
-))
+var TemplateFuncs = template.FuncMap{
+	"literal":   MarkdownLiteral,
+	"tableCell": MarkdownTableCell,
+}
 
-func RenderDirectoryIsNotTrackedYet(dir string) error {
-	return Render(DIRECTORY_IS_NOT_TRACKED_YET, Args{
-		"Dir": dir,
-	})
+func SafeText(value string) string {
+	var escaped strings.Builder
+	escaped.Grow(len(value))
+	for _, r := range value {
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			fmt.Fprintf(&escaped, `\x%02x`, r)
+			continue
+		}
+		escaped.WriteRune(r)
+	}
+	return escaped.String()
+}
+
+func MarkdownLiteral(value string) string {
+	value = SafeText(value)
+	var escaped strings.Builder
+	escaped.Grow(len(value))
+	for _, r := range value {
+		if strings.ContainsRune(`\`+"`*_{}[]<>()#+-.!|", r) {
+			escaped.WriteByte('\\')
+		}
+		escaped.WriteRune(r)
+	}
+	return escaped.String()
+}
+
+func MarkdownTableCell(value string) string {
+	return strings.ReplaceAll(MarkdownLiteral(value), "\n", `\n`)
 }

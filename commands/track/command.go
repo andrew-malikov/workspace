@@ -36,7 +36,7 @@ func (input input) Validate() error {
 	return nil
 }
 
-func NewCommand() *cli.Command {
+func NewCommand(renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:    "track",
 		Aliases: []string{"add", "tr"},
@@ -100,7 +100,7 @@ func NewCommand() *cli.Command {
 				return err
 			}
 
-			return view.Render(RESULT_TEMPLATE, view.Args{
+			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Alias":               project.Alias,
 				"Dir":                 project.Dir,
 				"HasCompose":          result.DoesComposeExist,
@@ -113,8 +113,8 @@ func NewCommand() *cli.Command {
 	}
 }
 
-var RESULT_TEMPLATE = template.Must(template.New("track_result").Parse(
-	`Project *{{.Alias}}* is tracked under **{{.Dir}}**
+var RESULT_TEMPLATE = template.Must(template.New("track_result").Funcs(view.TemplateFuncs).Parse(
+	`Project *{{.Alias | literal}}* is tracked under **{{.Dir | literal}}**
 
 * [{{if .HasCompose}}x{{else}} {{end}}] compose
 * [{{if .HasMigrations}}x{{else}} {{end}}] migrations
