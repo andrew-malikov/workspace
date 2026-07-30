@@ -1,9 +1,8 @@
-package up
+package down
 
 import (
 	"context"
 	"os"
-	"strings"
 	"text/template"
 
 	"github.com/andrew-malikov/workspace/console"
@@ -16,8 +15,8 @@ import (
 
 func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
-		Name:  "up",
-		Usage: "start project docker compose",
+		Name:  "down",
+		Usage: "stop project docker compose",
 		Arguments: []cli.Argument{
 			&cli.StringArg{
 				Name:      "alias",
@@ -26,13 +25,9 @@ func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command 
 		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
-				Name:  "alongside",
-				Usage: "keep other running docker compose projects active",
-			},
-			&cli.BoolFlag{
 				Name:    "blank",
 				Aliases: []string{"b"},
-				Usage:   "cleanup target docker compose volumes before starting",
+				Usage:   "cleanup target docker compose volumes while stopping",
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -46,28 +41,23 @@ func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command 
 				return err
 			}
 
+			blank := cmd.Bool("blank")
 			compose := containers.NewDockerCompose(terminal.Input, terminal.Output, terminal.Error)
-			result, err := workspace.UpProject(ctx, dir, cmd.StringArg("alias"), cmd.Bool("alongside"), cmd.Bool("blank"), compose)
+			project, err := workspace.DownProject(ctx, dir, cmd.StringArg("alias"), blank, compose)
 			if err != nil {
 				return err
 			}
 
 			return renderer.Render(RESULT_TEMPLATE, view.Args{
-				"Alias":     result.Alias,
-				"Alongside": result.Alongside,
-				"Blank":     result.Blank,
-				"Stopped":   strings.Join(result.Stopped, ", "),
+				"Alias": project.Alias,
+				"Blank": blank,
 			})
 		},
 	}
 }
 
-var RESULT_TEMPLATE = template.Must(template.New("up_result").Funcs(view.TemplateFuncs).Parse(
-	`Project *{{.Alias | literal}}* docker compose is up.
-{{if .Blank}}Target docker compose volumes were cleaned up before start.
-{{end}}
-{{if .Alongside}}Other running docker compose projects left active.
-{{else}}{{if .Stopped}}Stopped running docker compose projects: {{.Stopped | literal}}.
-{{else}}No other running docker compose projects found.
-{{end}}{{end}}`,
+var RESULT_TEMPLATE = template.Must(template.New("down_result").Funcs(view.TemplateFuncs).Parse(
+	`Project *{{.Alias | literal}}* docker compose is down.
+{{if .Blank}}Target docker compose volumes were cleaned up.
+{{end}}`,
 ))

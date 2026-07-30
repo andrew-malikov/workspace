@@ -12,7 +12,7 @@ func (project Project) HasRunningContainers(ctx context.Context, compose contain
 		return false, nil
 	}
 
-	return compose.HasRunning(ctx, project.Dir, *project.Compose)
+	return compose.HasRunning(ctx, project.composeTarget())
 }
 
 func (project Project) UpContainers(ctx context.Context, compose containers.Compose) error {
@@ -20,7 +20,7 @@ func (project Project) UpContainers(ctx context.Context, compose containers.Comp
 		return nil
 	}
 
-	return compose.Up(ctx, project.Dir, *project.Compose)
+	return compose.Up(ctx, project.composeTarget())
 }
 
 func (project Project) DownContainers(ctx context.Context, compose containers.Compose) error {
@@ -28,7 +28,7 @@ func (project Project) DownContainers(ctx context.Context, compose containers.Co
 		return nil
 	}
 
-	return compose.Down(ctx, project.Dir, *project.Compose)
+	return compose.Down(ctx, project.composeTarget())
 }
 
 func (project Project) CleanupContainers(ctx context.Context, compose containers.Compose) error {
@@ -36,5 +36,13 @@ func (project Project) CleanupContainers(ctx context.Context, compose containers
 		return nil
 	}
 
-	return compose.Cleanup(ctx, project.Dir, *project.Compose)
+	return compose.Cleanup(ctx, project.composeTarget())
+}
+
+func (project Project) composeTarget() containers.Target {
+	return containers.Target{
+		Alias: project.Alias,
+		Dir:   project.Dir,
+		File:  *project.Compose,
+	}
 }

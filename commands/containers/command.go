@@ -6,6 +6,7 @@ import (
 	"sort"
 	"text/template"
 
+	"github.com/andrew-malikov/workspace/console"
 	"github.com/andrew-malikov/workspace/containers"
 	"github.com/andrew-malikov/workspace/view"
 	"github.com/andrew-malikov/workspace/workspaces"
@@ -19,7 +20,7 @@ type runningProject struct {
 	Compose string
 }
 
-func NewCommand(renderer *view.Renderer) *cli.Command {
+func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command {
 	return &cli.Command{
 		Name:    "containers",
 		Aliases: []string{"ctrs"},
@@ -30,7 +31,7 @@ func NewCommand(renderer *view.Renderer) *cli.Command {
 				return err
 			}
 
-			compose := containers.DockerCompose{}
+			compose := containers.NewDockerCompose(terminal.Input, terminal.Output, terminal.Error)
 			running := make([]runningProject, 0, len(workspace.Projects))
 			for _, project := range workspace.Projects {
 				hasRunning, err := project.HasRunningContainers(ctx, compose)

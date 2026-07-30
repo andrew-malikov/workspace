@@ -3,6 +3,7 @@ package workspaces
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/andrew-malikov/workspace/containers"
@@ -44,11 +45,17 @@ func (workspace Workspace) UpProject(ctx context.Context, cwd string, alias stri
 
 	stopped := []string{}
 	if !alongside {
+		candidates := make([]projects.Project, 0, len(workspace.Projects)-1)
 		for _, project := range workspace.Projects {
-			if project.Alias == target.Alias {
-				continue
+			if project.Alias != target.Alias {
+				candidates = append(candidates, project)
 			}
+		}
+		sort.Slice(candidates, func(i, j int) bool {
+			return candidates[i].Alias < candidates[j].Alias
+		})
 
+		for _, project := range candidates {
 			hasRunning, err := project.HasRunningContainers(ctx, compose)
 			if err != nil {
 				return nil, err
@@ -78,7 +85,7 @@ func (workspace Workspace) UpProject(ctx context.Context, cwd string, alias stri
 	return &UpProjectResult{Alias: target.Alias, Alongside: alongside, Blank: blank, Stopped: stopped}, nil
 }
 
-func (workspace Workspace) DownProject(ctx context.Context, cwd string, alias string, compose containers.Compose) (*projects.Project, error) {
+func (workspace Workspace) DownProject(ctx context.Context, cwd string, alias string, blank bool, compose containers.Compose) (*projects.Project, error) {
 	project, err := workspace.ResolveProject(cwd, alias)
 	if err != nil {
 		return nil, err
@@ -88,7 +95,11 @@ func (workspace Workspace) DownProject(ctx context.Context, cwd string, alias st
 		return nil, fmt.Errorf("no docker compose configured for project %s", project.Alias)
 	}
 
-	if err := project.DownContainers(ctx, compose); err != nil {
+	if blank {
+		if err := project.CleanupContainers(ctx, compose); err != nil {
+			return nil, err
+		}
+	} else if err := project.DownContainers(ctx, compose); err != nil {
 		return nil, err
 	}
 

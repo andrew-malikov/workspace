@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/andrew-malikov/workspace/commands/containers"
+	"github.com/andrew-malikov/workspace/commands/down"
 	"github.com/andrew-malikov/workspace/commands/git/clear"
 	"github.com/andrew-malikov/workspace/commands/list"
 	"github.com/andrew-malikov/workspace/commands/scaffold"
@@ -50,10 +51,11 @@ func newCommand(terminal console.Console, renderer *view.Renderer) *cli.Command 
 		Commands: []*cli.Command{
 			list.NewCommand(renderer),
 			track.NewCommand(renderer),
-			up.NewCommand(renderer),
+			up.NewCommand(terminal, renderer),
+			down.NewCommand(terminal, renderer),
 			scaffold.NewCommand(renderer),
 			test.NewCommand(terminal),
-			containers.NewCommand(renderer),
+			containers.NewCommand(terminal, renderer),
 			untrack.NewCommand(renderer),
 			clear.NewCommand(terminal),
 		},

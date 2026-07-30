@@ -70,6 +70,24 @@ ws up <alias> --blank
 ws up <alias> -b
 ```
 
+`ws up` streams Docker Compose output as each project is stopped, cleaned, or started. Each action is preceded by its tracked project alias and exact Compose command so multi-project output remains distinguishable.
+
+Stop docker compose for the current tracked project or for a project selected by alias:
+
+```bash
+ws down
+ws down <alias>
+```
+
+By default, `ws down` preserves Compose volumes. Use `--blank` or `-b` to stop the target and remove its volumes with `docker compose down -v`:
+
+```bash
+ws down <alias> --blank
+ws down <alias> -b
+```
+
+`ws down` also streams native Docker Compose output under a project-and-operation heading.
+
 ## Run Tests
 
 There are three types of tests
