@@ -62,25 +62,52 @@ func NewCommand(terminal console.Console) *cli.Command {
 			}
 
 			// todo: keep the data mapping here and move all the logic into project module
-			testRunner := dotnet.NewTestRunner(dotnet.StdCommandRunner{
-				Input:  terminal.Input,
-				Output: terminal.Output,
-				Error:  terminal.Error,
-			}, terminal.Error)
-			for _, kind := range requestedKinds {
-				target := project.Test.Target(kind)
-				if !target.IsConfigured() {
-					return fmt.Errorf("%s tests are not configured for project %s", kind, project.Alias)
-				}
+			testRunner := dotnet.NewTestRunner(
+				dotnet.StdCommandRunner{Input: terminal.Input},
+				terminal.Output,
+				terminal.Error,
+			)
+			return runCategories(ctx, project, requestedKinds, testRunner, dotnet.NewTestRun)
 
-				if err := testRunner.Run(ctx, project.Dir, kind, target); err != nil {
-					return err
-				}
-			}
-
-			return nil
 		},
 	}
+}
+
+type categoryRunner interface {
+	Run(context.Context, string, dotnet.TestRun, projects.TestKind, projects.TestTarget) error
+}
+
+type testRunFactory func(string) (dotnet.TestRun, error)
+
+func runCategories(
+	ctx context.Context,
+	project *projects.Project,
+	requestedKinds []projects.TestKind,
+	runner categoryRunner,
+	createRun testRunFactory,
+) error {
+	var run dotnet.TestRun
+	runCreated := false
+	for _, kind := range requestedKinds {
+		target := project.Test.Target(kind)
+		if !target.IsConfigured() {
+			return fmt.Errorf("%s tests are not configured for project %s", kind, project.Alias)
+		}
+
+		if !runCreated {
+			var err error
+			run, err = createRun(project.Dir)
+			if err != nil {
+				return err
+			}
+			runCreated = true
+		}
+
+		if err := runner.Run(ctx, project.Dir, run, kind, target); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func resolveRequestedKinds(unit bool, integration bool, component bool) []projects.TestKind {

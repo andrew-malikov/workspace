@@ -36,8 +36,10 @@ out
 binaries
 dist
 
+# Workspace test logs
+.logs/
+
 # opencode and co.
 .opencode
 .omp
 .pi
-
