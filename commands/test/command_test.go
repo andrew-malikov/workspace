@@ -3,8 +3,10 @@ package test
 import (
 	"context"
 	"errors"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/andrew-malikov/workspace/dotnet"
 	"github.com/andrew-malikov/workspace/projects"
@@ -131,6 +133,28 @@ func TestRunCategoriesStopsAfterReportedFailure(t *testing.T) {
 	}
 	if !reflect.DeepEqual(runner.reported, wantKinds) {
 		t.Fatalf("failed category returned before reporting: got %v want %v", runner.reported, wantKinds)
+	}
+}
+
+func TestInterruptContextCancelsOnInterrupt(t *testing.T) {
+	ctx, stop := interruptContext(t.Context())
+	defer stop()
+
+	process, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatalf("find test process: %v", err)
+	}
+	if err := process.Signal(os.Interrupt); err != nil {
+		t.Fatalf("send interrupt: %v", err)
+	}
+
+	select {
+	case <-ctx.Done():
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			t.Fatalf("unexpected interrupt error: %v", ctx.Err())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("interrupt context was not canceled")
 	}
 }
 

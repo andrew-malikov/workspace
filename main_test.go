@@ -16,7 +16,7 @@ import (
 func TestRunUsesStdoutForSuccessfulResult(t *testing.T) {
 	useIsolatedWorkspace(t)
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "list"}, terminal)
 
@@ -34,7 +34,7 @@ func TestRunUsesStdoutForSuccessfulResult(t *testing.T) {
 func TestRunUsesStderrAndNonzeroForDomainFailure(t *testing.T) {
 	useIsolatedWorkspace(t)
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "test"}, terminal)
 
@@ -52,7 +52,7 @@ func TestRunUsesStderrAndNonzeroForDomainFailure(t *testing.T) {
 func TestRunRejectsNoninteractiveClearWithoutControlSequences(t *testing.T) {
 	useIsolatedWorkspace(t)
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "clear"}, terminal)
 
@@ -70,7 +70,7 @@ func TestRunRejectsNoninteractiveClearWithoutControlSequences(t *testing.T) {
 func TestRunUsesStderrAndNonzeroForCommandFailure(t *testing.T) {
 	useIsolatedWorkspace(t)
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "unknown"}, terminal)
 
@@ -89,7 +89,7 @@ func TestRunPropagatesRenderFailure(t *testing.T) {
 	useIsolatedWorkspace(t)
 	stdout := &applicationRejectingWriter{err: errors.New("stdout rejected")}
 	var stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "list"}, terminal)
 
@@ -122,7 +122,7 @@ func TestRunDownStreamsComposeAndSupportsBlankFlags(t *testing.T) {
 			setupComposeWorkspace(t, "orders")
 			callsPath := installFakeDocker(t)
 			var stdout, stderr bytes.Buffer
-			terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+			terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 			args := []string{"ws", "down", "orders"}
 			if tt.flag != "" {
 				args = append(args, tt.flag)
@@ -166,7 +166,7 @@ func TestRunDownFailureSuppressesSuccessResult(t *testing.T) {
 	installFakeDocker(t)
 	t.Setenv("WS_DOCKER_FAIL_ALIAS", "orders")
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "down", "orders"}, terminal)
 	if status == 0 {
@@ -202,7 +202,7 @@ func TestRunUpLabelsMultipleComposeActionsInStableOrder(t *testing.T) {
 		}
 	})
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false)
+	terminal := console.New(bytes.NewReader(nil), &stdout, &stderr, false, false, false, false)
 
 	status := run(t.Context(), []string{"ws", "up"}, terminal)
 	if status != 0 {

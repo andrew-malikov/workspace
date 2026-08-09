@@ -106,6 +106,8 @@ ws test -u
 ws test -ic
 ```
 
+On an interactive terminal, each category's live output runs on a temporary screen and collapses to its summary and log path when complete. Full output remains under `.logs/tests/<run-id>/<category>/output.log`. Redirected and CI output streams normally without terminal control sequences.
+
 It would check whether any other compose is up (across tracked ones) and down it.
 
 Configure global test discovery rules in `~/.config/ws/config.toml` and let `ws track` resolve the concrete test project paths for each tracked project:

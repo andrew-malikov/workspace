@@ -26,7 +26,7 @@ func NewTestRun(projectDir string) (TestRun, error) {
 		return TestRun{}, fmt.Errorf("resolve project directory: %w", err)
 	}
 
-	testsDir := filepath.Join(absoluteProjectDir, ".logs", "tests")
+	testsDir := filepath.Join(absoluteProjectDir, ".ws", "tests")
 	if err := os.MkdirAll(testsDir, 0o755); err != nil {
 		return TestRun{}, fmt.Errorf("create test logs directory: %w", err)
 	}

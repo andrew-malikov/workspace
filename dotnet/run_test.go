@@ -20,7 +20,7 @@ func TestNewTestRunCreatesUniqueProjectLocalRoots(t *testing.T) {
 		t.Fatalf("create second test run: %v", err)
 	}
 
-	logsRoot := filepath.Join(projectDir, ".logs", "tests") + string(filepath.Separator)
+	logsRoot := filepath.Join(projectDir, ".ws", "tests") + string(filepath.Separator)
 	if !strings.HasPrefix(first.Root, logsRoot) {
 		t.Fatalf("first root is not project-local: %q", first.Root)
 	}

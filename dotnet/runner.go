@@ -45,20 +45,26 @@ func (runner StdCommandRunner) Exec(ctx context.Context, execution Command) erro
 }
 
 type TestRunner struct {
-	commandRunner CommandRunner
-	output        io.Writer
-	errorOutput   io.Writer
+	commandRunner   CommandRunner
+	output          io.Writer
+	errorOutput     io.Writer
+	newPresentation presentationFactory
 }
 
-func NewTestRunner(commandRunner CommandRunner, output, errorOutput io.Writer) TestRunner {
+func NewTestRunner(commandRunner CommandRunner, output, errorOutput io.Writer, transient bool) TestRunner {
+	factory := newPlainPresentation
+	if transient {
+		factory = newAlternateScreenPresentation
+	}
 	return TestRunner{
-		commandRunner: commandRunner,
-		output:        output,
-		errorOutput:   errorOutput,
+		commandRunner:   commandRunner,
+		output:          output,
+		errorOutput:     errorOutput,
+		newPresentation: factory,
 	}
 }
 
-func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind projects.TestKind, target projects.TestTarget) error {
+func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind projects.TestKind, target projects.TestTarget) (runErr error) {
 	artifacts, err := run.createArtifacts(kind)
 	if err != nil {
 		return err
@@ -78,6 +84,14 @@ func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind 
 		args = append(args, "--filter", target.Filter)
 	}
 
+	presentation := runner.newPresentation(runner.errorOutput)
+	if err := presentation.Begin(); err != nil {
+		return errors.Join(err, logFile.Close())
+	}
+	defer func() {
+		runErr = errors.Join(runErr, presentation.End())
+	}()
+
 	if _, err := fmt.Fprintf(runner.errorOutput, "----- %s -----\ndotnet %s\n", kind, formatCommand(args)); err != nil {
 		return errors.Join(err, logFile.Close())
 	}
@@ -93,8 +107,9 @@ func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind 
 	closeErr := logFile.Close()
 
 	summary, summaryErr := loadTestSummary(artifacts.resultsDir)
+	presentationErr := presentation.End()
 	reportErr := runner.report(kind, summary, summaryErr, artifacts.logPath)
-	return errors.Join(commandErr, closeErr, summaryErr, reportErr)
+	return errors.Join(commandErr, closeErr, summaryErr, presentationErr, reportErr)
 }
 
 func (runner TestRunner) report(kind projects.TestKind, summary TestSummary, summaryErr error, logPath string) error {

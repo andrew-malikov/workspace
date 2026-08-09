@@ -53,6 +53,6 @@ Print a labeled absolute native filesystem path as plain text. Modern terminals 
 - [TRX shape differs across SDK or runner versions] → Decode only the stable result-summary counters, cover representative fixtures, and fail explicitly when counters are unavailable.
 - [Multiple target frameworks produce several result files] → Recursively discover and aggregate every TRX file under the category results directory.
 - [stdout and stderr writes race into one file] → Serialize writes to the shared log sink while preserving separate terminal destinations.
-- [`.logs` grows indefinitely] → Use isolated sortable run directories and document that retention is intentionally user-managed; automated deletion is outside this change.
-- [Project-local logs appear as untracked files] → Add `.logs/` to this repository's ignore rules and make the directory contract explicit for projects using `ws`.
+- [`.ws` grows indefinitely] → Use isolated sortable run directories and document that retention is intentionally user-managed; automated deletion is outside this change.
+- [Project-local logs appear as untracked files] → Add `.ws/` to this repository's ignore rules and make the directory contract explicit for projects using `ws`.
 - [A log cannot be created] → Fail before launching tests so the command never claims durable logging that did not occur.

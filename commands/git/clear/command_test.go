@@ -12,7 +12,7 @@ import (
 
 func TestClearRejectsNoninteractiveStreamsBeforeLaunchingUI(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(strings.NewReader(""), &stdout, &stderr, false, false, false)
+	terminal := console.New(strings.NewReader(""), &stdout, &stderr, false, false, false, false)
 	built := false
 	launched := false
 	command := newCommand(
@@ -42,7 +42,7 @@ func TestClearRejectsNoninteractiveStreamsBeforeLaunchingUI(t *testing.T) {
 
 func TestClearLaunchesUIWithInteractiveStreams(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	terminal := console.New(strings.NewReader(""), &stdout, &stderr, true, true, false)
+	terminal := console.New(strings.NewReader(""), &stdout, &stderr, true, true, false, false)
 	built := false
 	launched := false
 	command := newCommand(

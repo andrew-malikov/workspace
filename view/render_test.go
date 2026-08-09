@@ -46,7 +46,7 @@ func TestRendererSelectsRichOrPlainOutput(t *testing.T) {
 
 func TestRendererHonorsNoColorOnTerminal(t *testing.T) {
 	var output, errorOutput bytes.Buffer
-	terminal := console.New(nil, &output, &errorOutput, true, true, true)
+	terminal := console.New(nil, &output, &errorOutput, true, true, false, true)
 	renderer, err := NewRenderer(terminal.Output, terminal.Color)
 	if err != nil {
 		t.Fatalf("create renderer: %v", err)

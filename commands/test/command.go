@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/andrew-malikov/workspace/console"
 	"github.com/andrew-malikov/workspace/dotnet"
@@ -61,16 +62,19 @@ func NewCommand(terminal console.Console) *cli.Command {
 				return fmt.Errorf("no tests are configured for project %s", project.Alias)
 			}
 
+			runCtx, stop := interruptContext(ctx)
+			defer stop()
+
 			// todo: keep the data mapping here and move all the logic into project module
-			testRunner := dotnet.NewTestRunner(
-				dotnet.StdCommandRunner{Input: terminal.Input},
-				terminal.Output,
-				terminal.Error,
-			)
-			return runCategories(ctx, project, requestedKinds, testRunner, dotnet.NewTestRun)
+			testRunner := dotnet.NewTestRunner(dotnet.StdCommandRunner{Input: terminal.Input}, terminal.Output, terminal.Error, terminal.SharedTerminal)
+			return runCategories(runCtx, project, requestedKinds, testRunner, dotnet.NewTestRun)
 
 		},
 	}
+}
+
+func interruptContext(parent context.Context) (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(parent, os.Interrupt)
 }
 
 type categoryRunner interface {

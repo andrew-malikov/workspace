@@ -12,7 +12,7 @@ The system SHALL identify each selected test category and stream that category's
 - **THEN** the system makes that output visible on the corresponding terminal stream without waiting for the category to finish
 
 ### Requirement: Durable per-category logs
-The system SHALL persist the complete process output for each executed category beneath `.logs/tests/<run-id>/<category>/output.log` in the resolved project directory, where each invocation has a unique, sortable run identifier and category logs from the same invocation share one run directory.
+The system SHALL persist the complete process output for each executed category beneath `.ws/tests/<run-id>/<category>/output.log` in the resolved project directory, where each invocation has a unique, sortable run identifier and category logs from the same invocation share one run directory.
 
 #### Scenario: Multiple categories execute
 - **WHEN** one `ws test` invocation executes more than one category

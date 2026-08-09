@@ -2,7 +2,7 @@
 
 - [x] 1.1 Add a TRX result model and XML aggregation logic for total, passed, failed, and skipped counters across every result file in a category directory.
 - [x] 1.2 Cover single-file, multi-file, missing-file, malformed-file, and missing-counter TRX behavior with focused `dotnet` package tests.
-- [x] 1.3 Add project-local `.logs/tests/<run-id>/<category>` path creation with sortable unique run identifiers, shared run roots, and absolute output paths.
+- [x] 1.3 Add project-local `.ws/tests/<run-id>/<category>` path creation with sortable unique run identifiers, shared run roots, and absolute output paths.
 
 ## 2. Live Output and Artifact Capture
 
@@ -16,7 +16,7 @@
 - [x] 3.1 Create one run root per `ws test` invocation and pass the corresponding category paths through sequential unit, integration, and component execution.
 - [x] 3.2 Print each category heading before live output, then print exactly one concise aggregate summary and the absolute plain-text `output.log` path after process completion.
 - [x] 3.3 Report unavailable summaries without fabricated counts, preserve the original process failure alongside reporting failures, and retain stop-on-failure category semantics.
-- [x] 3.4 Add `.logs/` to repository ignore rules so generated local test evidence does not enter version control.
+- [x] 3.4 Add `.ws/` to repository ignore rules so generated local test evidence does not enter version control.
 
 ## 4. Verification
 

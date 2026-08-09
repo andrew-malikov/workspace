@@ -36,8 +36,8 @@ out
 binaries
 dist
 
-# Workspace test logs
-.logs/
+# Workspace cache data
+.ws/
 
 # opencode and co.
 .opencode
