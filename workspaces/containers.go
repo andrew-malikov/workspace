@@ -43,46 +43,25 @@ func (workspace Workspace) UpProject(ctx context.Context, cwd string, alias stri
 		return nil, fmt.Errorf("no docker compose configured for project %s", target.Alias)
 	}
 
-	stopped := []string{}
+	var others []OtherProject
 	if !alongside {
-		candidates := make([]projects.Project, 0, len(workspace.Projects)-1)
-		for _, project := range workspace.Projects {
-			if project.Alias != target.Alias {
-				candidates = append(candidates, project)
-			}
-		}
-		sort.Slice(candidates, func(i, j int) bool {
-			return candidates[i].Alias < candidates[j].Alias
-		})
-
-		for _, project := range candidates {
-			hasRunning, err := project.HasRunningContainers(ctx, compose)
-			if err != nil {
-				return nil, err
-			}
-
-			if !hasRunning {
-				continue
-			}
-
-			if err := project.DownContainers(ctx, compose); err != nil {
-				return nil, err
-			}
-			stopped = append(stopped, project.Alias)
-		}
-	}
-
-	if blank {
-		if err := target.CleanupContainers(ctx, compose); err != nil {
+		others, err = workspace.probeOthers(ctx, target.Alias, compose)
+		if err != nil {
 			return nil, err
 		}
 	}
 
-	if err := target.UpContainers(ctx, compose); err != nil {
+	plan := PlanUp(target.Alias, others, alongside, blank)
+	if err := workspace.execute(ctx, compose, plan); err != nil {
 		return nil, err
 	}
 
-	return &UpProjectResult{Alias: target.Alias, Alongside: alongside, Blank: blank, Stopped: stopped}, nil
+	return &UpProjectResult{
+		Alias:     target.Alias,
+		Alongside: alongside,
+		Blank:     blank,
+		Stopped:   stoppedAliases(plan),
+	}, nil
 }
 
 func (workspace Workspace) DownProject(ctx context.Context, cwd string, alias string, blank bool, compose containers.Compose) (*projects.Project, error) {
@@ -95,13 +74,61 @@ func (workspace Workspace) DownProject(ctx context.Context, cwd string, alias st
 		return nil, fmt.Errorf("no docker compose configured for project %s", project.Alias)
 	}
 
-	if blank {
-		if err := project.CleanupContainers(ctx, compose); err != nil {
-			return nil, err
-		}
-	} else if err := project.DownContainers(ctx, compose); err != nil {
+	if err := workspace.execute(ctx, compose, PlanDown(project.Alias, blank)); err != nil {
 		return nil, err
 	}
 
 	return project, nil
+}
+
+func (workspace Workspace) probeOthers(ctx context.Context, targetAlias string, compose containers.Compose) ([]OtherProject, error) {
+	aliases := make([]string, 0, len(workspace.Projects))
+	for alias := range workspace.Projects {
+		if alias == targetAlias {
+			continue
+		}
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+
+	others := make([]OtherProject, 0, len(aliases))
+	for _, alias := range aliases {
+		project := workspace.Projects[alias]
+		configured := project.IsComposeConfigured()
+		running := false
+		if configured {
+			var err error
+			running, err = project.HasRunningContainers(ctx, compose)
+			if err != nil {
+				return nil, err
+			}
+		}
+		others = append(others, OtherProject{Alias: alias, Configured: configured, Running: running})
+	}
+	return others, nil
+}
+
+func (workspace Workspace) execute(ctx context.Context, compose containers.Compose, plan []Action) error {
+	for _, action := range plan {
+		project, ok := workspace.Projects[action.Alias]
+		if !ok {
+			return fmt.Errorf("planned project is not tracked: %s", action.Alias)
+		}
+		target := containers.Target{Alias: project.Alias, Dir: project.Dir, File: *project.Compose}
+		var err error
+		switch action.Kind {
+		case ActionStop:
+			err = compose.Down(ctx, target)
+		case ActionCleanup:
+			err = compose.Cleanup(ctx, target)
+		case ActionStart:
+			err = compose.Up(ctx, target)
+		default:
+			return fmt.Errorf("unknown compose action %q", action.Kind)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

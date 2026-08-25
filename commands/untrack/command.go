@@ -2,7 +2,6 @@ package untrack
 
 import (
 	"context"
-	"os"
 	"strings"
 	"text/template"
 
@@ -12,7 +11,8 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func NewCommand(renderer *view.Renderer) *cli.Command {
+
+func NewCommand(renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:    "untrack",
 		Aliases: []string{"remove", "untr"},
@@ -34,14 +34,14 @@ func NewCommand(renderer *view.Renderer) *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			alsdir := cmd.StringArg("alsdir")
 			if strings.TrimSpace(alsdir) == "" {
-				wd, err := os.Getwd()
+				wd, err := session.Cwd()
 				if err != nil {
 					return err
 				}
 				alsdir = wd
 			}
 
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}
@@ -51,9 +51,10 @@ func NewCommand(renderer *view.Renderer) *cli.Command {
 				return err
 			}
 
-			if err := workspaces.SaveWorkspace(*workspace); err != nil {
+			if err := session.Save(*workspace); err != nil {
 				return err
 			}
+
 
 			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Alias": removedProject.Alias,

@@ -20,13 +20,13 @@ type listedProject struct {
 	sortOrder string
 }
 
-func NewCommand(renderer *view.Renderer) *cli.Command {
+func NewCommand(renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:    "list",
 		Aliases: []string{"ls"},
 		Usage:   "list tracked projects",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}

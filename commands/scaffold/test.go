@@ -3,7 +3,6 @@ package scaffold
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"text/template"
 
@@ -14,7 +13,8 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func newTestCommand(renderer *view.Renderer) *cli.Command {
+
+func newTestCommand(renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:  "test",
 		Usage: "copy global test options into a tracked project",
@@ -25,12 +25,21 @@ func newTestCommand(renderer *view.Renderer) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}
 
-			project, err := resolveProject(workspace, cmd.StringArg("directory_or_alias"))
+			alsdir := cmd.StringArg("directory_or_alias")
+			if strings.TrimSpace(alsdir) == "" {
+				dir, err := session.Cwd()
+				if err != nil {
+					return err
+				}
+				alsdir = dir
+			}
+
+			project, err := resolveProject(workspace, alsdir)
 			if err != nil {
 				return err
 			}
@@ -40,9 +49,10 @@ func newTestCommand(renderer *view.Renderer) *cli.Command {
 			}
 
 			workspace.Projects[project.Alias] = *project
-			if err := workspaces.SaveWorkspace(*workspace); err != nil {
+			if err := session.Save(*workspace); err != nil {
 				return err
 			}
+
 
 			return renderer.Render(TEST_RESULT_TEMPLATE, view.Args{
 				"Alias":               project.Alias,
@@ -55,17 +65,10 @@ func newTestCommand(renderer *view.Renderer) *cli.Command {
 }
 
 func resolveProject(workspace *workspaces.Workspace, alsdir string) (*projects.Project, error) {
-	if strings.TrimSpace(alsdir) == "" {
-		dir, err := os.Getwd()
-		if err != nil {
-			return nil, err
-		}
-		return resolveProject(workspace, dir)
-	}
-
 	if project, ok := workspace.Projects[alsdir]; ok {
 		return &project, nil
 	}
+
 
 	project := workspace.ResolveProjectByDir(alsdir)
 	if project != nil {

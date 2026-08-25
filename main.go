@@ -16,22 +16,24 @@ import (
 	"github.com/andrew-malikov/workspace/commands/up"
 	"github.com/andrew-malikov/workspace/console"
 	"github.com/andrew-malikov/workspace/view"
+	"github.com/andrew-malikov/workspace/workspaces"
+
 
 	"github.com/urfave/cli/v3"
 )
 
 func main() {
-	os.Exit(run(context.Background(), os.Args, console.OS()))
+	os.Exit(run(context.Background(), os.Args, console.OS(), workspaces.DefaultSession()))
 }
 
-func run(ctx context.Context, args []string, terminal console.Console) int {
+func run(ctx context.Context, args []string, terminal console.Console, session workspaces.Session) int {
 	renderer, err := view.NewRenderer(terminal.Output, terminal.Color)
 	if err != nil {
 		presentFailure(terminal, err)
 		return 1
 	}
 
-	command := newCommand(terminal, renderer)
+	command := newCommand(terminal, renderer, session)
 	if err := command.Run(ctx, args); err != nil {
 		presentFailure(terminal, err)
 		return 1
@@ -39,7 +41,7 @@ func run(ctx context.Context, args []string, terminal console.Console) int {
 	return 0
 }
 
-func newCommand(terminal console.Console, renderer *view.Renderer) *cli.Command {
+func newCommand(terminal console.Console, renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:                   "ws",
 		Usage:                  "workspace you way out",
@@ -49,15 +51,15 @@ func newCommand(terminal console.Console, renderer *view.Renderer) *cli.Command 
 		ErrWriter:              terminal.Error,
 		ExitErrHandler:         func(context.Context, *cli.Command, error) {},
 		Commands: []*cli.Command{
-			list.NewCommand(renderer),
-			track.NewCommand(renderer),
-			up.NewCommand(terminal, renderer),
-			down.NewCommand(terminal, renderer),
-			scaffold.NewCommand(renderer),
-			test.NewCommand(terminal),
-			containers.NewCommand(terminal, renderer),
-			untrack.NewCommand(renderer),
-			clear.NewCommand(terminal),
+			list.NewCommand(renderer, session),
+			track.NewCommand(renderer, session),
+			up.NewCommand(terminal, renderer, session),
+			down.NewCommand(terminal, renderer, session),
+			scaffold.NewCommand(renderer, session),
+			test.NewCommand(terminal, session),
+			containers.NewCommand(terminal, renderer, session),
+			untrack.NewCommand(renderer, session),
+			clear.NewCommand(terminal, session),
 		},
 	}
 }

@@ -9,86 +9,102 @@ import (
 	"github.com/andrew-malikov/workspace/projects"
 )
 
-func TestLoadWorkspaceNormalizesOwnershipLookback(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", ".config")
-
-	configPath := filepath.Join(home, ".config", "ws", "config.toml")
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		t.Fatalf("mkdir config dir: %v", err)
-	}
-
-	content := []byte("[projects]\n")
-	if err := os.WriteFile(configPath, content, 0o644); err != nil {
+func TestLoadReadsProvidedPathWithoutHome(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[projects]\n"), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
-	workspace, err := LoadWorkspace()
+	workspace, err := Load(path)
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
-
 	if workspace.Git.Clear.Ownership.LookbackCommits != 3 {
 		t.Fatalf("expected default lookback 3, got %d", workspace.Git.Clear.Ownership.LookbackCommits)
 	}
 }
 
-func TestLoadWorkspaceRejectsInvalidOwnershipRegex(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", ".config")
+func TestSaveWritesProvidedPathWithoutHome(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "config.toml")
+	workspace := Workspace{Projects: map[string]projects.Project{
+		"orders": {Alias: "orders", Dir: "/tmp/orders"},
+	}}
 
-	configPath := filepath.Join(home, ".config", "ws", "config.toml")
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		t.Fatalf("mkdir config dir: %v", err)
+	if err := Save(path, workspace); err != nil {
+		t.Fatalf("save workspace: %v", err)
 	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("reload workspace: %v", err)
+	}
+	if loaded.Projects["orders"].Dir != "/tmp/orders" {
+		t.Fatalf("unexpected saved project: %+v", loaded.Projects["orders"])
+	}
+}
 
+func TestLoadRejectsInvalidOwnershipRegex(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
 	content := []byte(strings.Join([]string{
 		"[git.clear.ownership.include]",
 		"message_patterns = ['(']",
 	}, "\n"))
-	if err := os.WriteFile(configPath, content, 0o644); err != nil {
+	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, err := LoadWorkspace()
+	_, err := Load(path)
 	if err == nil {
 		t.Fatal("expected invalid regex error")
 	}
-
 	if !strings.Contains(err.Error(), "git.clear.ownership.include.message_patterns") {
 		t.Fatalf("expected field name in error, got %v", err)
 	}
 }
 
-func TestLoadWorkspaceRejectsInvalidTestRegex(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", ".config")
-
-	configPath := filepath.Join(home, ".config", "ws", "config.toml")
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		t.Fatalf("mkdir config dir: %v", err)
-	}
-
+func TestLoadRejectsInvalidTestRegex(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
 	content := []byte(strings.Join([]string{
 		"[test.unit]",
 		"project_patterns = ['(']",
 	}, "\n"))
-	if err := os.WriteFile(configPath, content, 0o644); err != nil {
+	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, err := LoadWorkspace()
+	_, err := Load(path)
 	if err == nil {
 		t.Fatal("expected invalid regex error")
 	}
-
 	if !strings.Contains(err.Error(), "test.unit.project_patterns") {
 		t.Fatalf("expected field name in error, got %v", err)
 	}
 }
+
+func TestConfigPathUsesHomeAndXDGRules(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	path, err := ConfigPath()
+	if err != nil {
+		t.Fatalf("config path: %v", err)
+	}
+	want := filepath.Join(home, DEFAULT_UNIX_CONFIG_DIR, "ws", "config.toml")
+	if path != want {
+		t.Fatalf("unexpected default path: got %q want %q", path, want)
+	}
+
+	t.Setenv("XDG_CONFIG_HOME", ".config")
+	path, err = ConfigPath()
+	if err != nil {
+		t.Fatalf("config path with xdg: %v", err)
+	}
+	want = filepath.Join(home, ".config", "ws", "config.toml")
+	if path != want {
+		t.Fatalf("unexpected xdg path: got %q want %q", path, want)
+	}
+}
+
 
 func TestResolveProjectByDirMatchesNestedDirectory(t *testing.T) {
 	workspace := Workspace{

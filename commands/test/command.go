@@ -14,7 +14,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func NewCommand(terminal console.Console) *cli.Command {
+func NewCommand(terminal console.Console, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:                   "test",
 		Aliases:                []string{"t"},
@@ -38,15 +38,16 @@ func NewCommand(terminal console.Console) *cli.Command {
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}
 
-			dir, err := os.Getwd()
+			dir, err := session.Cwd()
 			if err != nil {
 				return err
 			}
+
 
 			project := workspace.ResolveProjectByDir(dir)
 			if project == nil {

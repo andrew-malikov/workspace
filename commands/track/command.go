@@ -36,7 +36,7 @@ func (input input) Validate() error {
 	return nil
 }
 
-func NewCommand(renderer *view.Renderer) *cli.Command {
+func NewCommand(renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:    "track",
 		Aliases: []string{"add", "tr"},
@@ -85,7 +85,7 @@ func NewCommand(renderer *view.Renderer) *cli.Command {
 				return err
 			}
 
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}
@@ -95,10 +95,11 @@ func NewCommand(renderer *view.Renderer) *cli.Command {
 				return err
 			}
 
-			err = workspaces.SaveWorkspace(*workspace)
+			err = session.Save(*workspace)
 			if err != nil {
 				return err
 			}
+
 
 			return renderer.Render(RESULT_TEMPLATE, view.Args{
 				"Alias":               project.Alias,

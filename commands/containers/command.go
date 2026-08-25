@@ -7,12 +7,12 @@ import (
 	"text/template"
 
 	"github.com/andrew-malikov/workspace/console"
-	"github.com/andrew-malikov/workspace/containers"
 	"github.com/andrew-malikov/workspace/view"
 	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
+
 
 type runningProject struct {
 	Alias   string
@@ -20,18 +20,19 @@ type runningProject struct {
 	Compose string
 }
 
-func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command {
+func NewCommand(terminal console.Console, renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:    "containers",
 		Aliases: []string{"ctrs"},
 		Usage:   "list projects with running docker compose services",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}
 
-			compose := containers.NewDockerCompose(terminal.Input, terminal.Output, terminal.Error)
+			compose := session.Compose(terminal)
+
 			running := make([]runningProject, 0, len(workspace.Projects))
 			for _, project := range workspace.Projects {
 				hasRunning, err := project.HasRunningContainers(ctx, compose)

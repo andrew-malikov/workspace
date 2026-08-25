@@ -218,7 +218,7 @@ const DEFAULT_UNIX_CONFIG_DIR = ".config"
 
 var CONFIG_PERMISSION = os.FileMode(0777)
 
-func getConfigPath() (*string, error) {
+func ConfigPath() (string, error) {
 	osType := runtime.GOOS
 
 	var dir string
@@ -230,40 +230,31 @@ func getConfigPath() (*string, error) {
 		if dir == "" {
 			dir = DEFAULT_UNIX_CONFIG_DIR
 		}
-		break
 
 	default:
-		return nil, fmt.Errorf("The OS isn't supported yet: %s\n", osType)
+		return "", fmt.Errorf("The OS isn't supported yet: %s\n", osType)
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	path := filepath.Join(home, dir, "ws/config.toml")
-	return &path, nil
+	return filepath.Join(home, dir, "ws/config.toml"), nil
 }
 
-func LoadWorkspace() (*Workspace, error) {
-	configPath, err := getConfigPath()
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := os.ReadFile(*configPath)
+func Load(path string) (*Workspace, error) {
+	content, err := os.ReadFile(path)
 	if err != nil {
 		workspace := emptyWorkspace()
 		workspace.Normalize()
-		err = SaveWorkspace(workspace)
-		if err != nil {
+		if err := Save(path, workspace); err != nil {
 			return nil, err
 		}
 		return &workspace, nil
 	}
 
 	var workspace *Workspace
-	err = toml.Unmarshal(content, &workspace)
-	if err != nil {
+	if err := toml.Unmarshal(content, &workspace); err != nil {
 		return nil, err
 	}
 
@@ -275,23 +266,19 @@ func LoadWorkspace() (*Workspace, error) {
 	return workspace, nil
 }
 
-func SaveWorkspace(workspace Workspace) error {
+func Save(path string, workspace Workspace) error {
 	workspace.Normalize()
 	if err := workspace.Validate(); err != nil {
 		return err
 	}
 
-	configPath, err := getConfigPath()
-	if err != nil {
-		return err
-	}
 	content, err := toml.Marshal(workspace)
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(filepath.Dir(*configPath), CONFIG_PERMISSION)
-	if err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), CONFIG_PERMISSION); err != nil {
 		return err
 	}
-	return os.WriteFile(*configPath, content, CONFIG_PERMISSION)
+	return os.WriteFile(path, content, CONFIG_PERMISSION)
 }
+

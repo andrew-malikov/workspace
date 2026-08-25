@@ -2,18 +2,16 @@ package down
 
 import (
 	"context"
-	"os"
 	"text/template"
 
 	"github.com/andrew-malikov/workspace/console"
-	"github.com/andrew-malikov/workspace/containers"
 	"github.com/andrew-malikov/workspace/view"
 	"github.com/andrew-malikov/workspace/workspaces"
 
 	"github.com/urfave/cli/v3"
 )
 
-func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command {
+func NewCommand(terminal console.Console, renderer *view.Renderer, session workspaces.Session) *cli.Command {
 	return &cli.Command{
 		Name:  "down",
 		Usage: "stop project docker compose",
@@ -31,19 +29,18 @@ func NewCommand(terminal console.Console, renderer *view.Renderer) *cli.Command 
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			workspace, err := workspaces.LoadWorkspace()
+			workspace, err := session.Load()
 			if err != nil {
 				return err
 			}
 
-			dir, err := os.Getwd()
+			dir, err := session.Cwd()
 			if err != nil {
 				return err
 			}
 
 			blank := cmd.Bool("blank")
-			compose := containers.NewDockerCompose(terminal.Input, terminal.Output, terminal.Error)
-			project, err := workspace.DownProject(ctx, dir, cmd.StringArg("alias"), blank, compose)
+			project, err := workspace.DownProject(ctx, dir, cmd.StringArg("alias"), blank, session.Compose(terminal))
 			if err != nil {
 				return err
 			}

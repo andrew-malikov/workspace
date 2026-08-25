@@ -3,7 +3,6 @@ package clear
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/andrew-malikov/workspace/console"
 	"github.com/andrew-malikov/workspace/vcs"
@@ -14,8 +13,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func NewCommand(terminal console.Console) *cli.Command {
-	return newCommand(terminal, buildUI, runProgram)
+func NewCommand(terminal console.Console, session workspaces.Session) *cli.Command {
+	return newCommand(terminal, func(ctx context.Context) (tea.Model, error) {
+		return buildUI(ctx, session)
+	}, runProgram)
 }
 
 type programRunner func(tea.Model, ...tea.ProgramOption) error
@@ -48,13 +49,13 @@ func newCommand(terminal console.Console, build modelBuilder, run programRunner)
 	}
 }
 
-func buildUI(ctx context.Context) (tea.Model, error) {
-	workspace, err := workspaces.LoadWorkspace()
+func buildUI(ctx context.Context, session workspaces.Session) (tea.Model, error) {
+	workspace, err := session.Load()
 	if err != nil {
 		return nil, err
 	}
 
-	dir, err := os.Getwd()
+	dir, err := session.Cwd()
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package projects
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/andrew-malikov/workspace/vcs"
@@ -14,6 +15,10 @@ type Project struct {
 	Compose    *string
 	Migrations *string
 	Test       TestConfig `toml:"test"`
+}
+
+func (project Project) IsComposeConfigured() bool {
+	return project.Compose != nil && strings.TrimSpace(*project.Compose) != ""
 }
 
 func (project Project) DoesComposeExist() bool {

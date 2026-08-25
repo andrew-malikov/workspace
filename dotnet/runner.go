@@ -44,11 +44,14 @@ func (runner StdCommandRunner) Exec(ctx context.Context, execution Command) erro
 	return nil
 }
 
+type summaryLoader func(resultsDir string) (TestSummary, error)
+
 type TestRunner struct {
 	commandRunner   CommandRunner
 	output          io.Writer
 	errorOutput     io.Writer
 	newPresentation presentationFactory
+	loadSummary     summaryLoader
 }
 
 func NewTestRunner(commandRunner CommandRunner, output, errorOutput io.Writer, transient bool) TestRunner {
@@ -56,13 +59,55 @@ func NewTestRunner(commandRunner CommandRunner, output, errorOutput io.Writer, t
 	if transient {
 		factory = newAlternateScreenPresentation
 	}
+	return makeTestRunner(commandRunner, output, errorOutput, factory, loadTestSummary)
+}
+
+func makeTestRunner(
+	commandRunner CommandRunner,
+	output, errorOutput io.Writer,
+	newPresentation presentationFactory,
+	loadSummary summaryLoader,
+) TestRunner {
 	return TestRunner{
 		commandRunner:   commandRunner,
 		output:          output,
 		errorOutput:     errorOutput,
-		newPresentation: factory,
+		newPresentation: newPresentation,
+		loadSummary:     loadSummary,
 	}
 }
+
+func TestArgs(kind projects.TestKind, filter string, resultsDir string) []string {
+	args := []string{
+		"test",
+		"--logger", "trx;LogFilePrefix=" + string(kind),
+		"--results-directory", resultsDir,
+	}
+	if strings.TrimSpace(filter) != "" {
+		args = append(args, "--filter", filter)
+	}
+	return args
+}
+
+func CategoryReport(kind projects.TestKind, summary TestSummary, summaryErr error, logPath string) string {
+	var report strings.Builder
+	if summaryErr != nil {
+		fmt.Fprintf(&report, "%s summary unavailable: %v\n", kind, summaryErr)
+	} else {
+		fmt.Fprintf(
+			&report,
+			"%s summary: total %d, passed %d, failed %d, skipped %d\n",
+			kind,
+			summary.Total,
+			summary.Passed,
+			summary.Failed,
+			summary.Skipped,
+		)
+	}
+	fmt.Fprintf(&report, "Log: %s\n", logPath)
+	return report.String()
+}
+
 
 func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind projects.TestKind, target projects.TestTarget) (runErr error) {
 	artifacts, err := run.createArtifacts(kind)
@@ -75,14 +120,8 @@ func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind 
 		return fmt.Errorf("open %s test log: %w", kind, err)
 	}
 
-	args := []string{
-		"test",
-		"--logger", "trx;LogFilePrefix=" + string(kind),
-		"--results-directory", artifacts.resultsDir,
-	}
-	if strings.TrimSpace(target.Filter) != "" {
-		args = append(args, "--filter", target.Filter)
-	}
+	args := TestArgs(kind, target.Filter, artifacts.resultsDir)
+
 
 	presentation := runner.newPresentation(runner.errorOutput)
 	if err := presentation.Begin(); err != nil {
@@ -106,29 +145,15 @@ func (runner TestRunner) Run(ctx context.Context, dir string, run TestRun, kind 
 	})
 	closeErr := logFile.Close()
 
-	summary, summaryErr := loadTestSummary(artifacts.resultsDir)
+	summary, summaryErr := runner.loadSummary(artifacts.resultsDir)
 	presentationErr := presentation.End()
 	reportErr := runner.report(kind, summary, summaryErr, artifacts.logPath)
 	return errors.Join(commandErr, closeErr, summaryErr, presentationErr, reportErr)
 }
 
 func (runner TestRunner) report(kind projects.TestKind, summary TestSummary, summaryErr error, logPath string) error {
-	var reportErr error
-	if summaryErr != nil {
-		_, reportErr = fmt.Fprintf(runner.errorOutput, "%s summary unavailable: %v\n", kind, summaryErr)
-	} else {
-		_, reportErr = fmt.Fprintf(
-			runner.errorOutput,
-			"%s summary: total %d, passed %d, failed %d, skipped %d\n",
-			kind,
-			summary.Total,
-			summary.Passed,
-			summary.Failed,
-			summary.Skipped,
-		)
-	}
-	_, pathErr := fmt.Fprintf(runner.errorOutput, "Log: %s\n", logPath)
-	return errors.Join(reportErr, pathErr)
+	_, err := io.WriteString(runner.errorOutput, CategoryReport(kind, summary, summaryErr, logPath))
+	return err
 }
 
 type synchronizedWriter struct {

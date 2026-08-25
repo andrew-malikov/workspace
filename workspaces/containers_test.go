@@ -86,179 +86,31 @@ func TestResolveProjectMatchesAlias(t *testing.T) {
 	}
 }
 
-func TestUpProjectStopsOtherRunningComposeByDefault(t *testing.T) {
-	targetDir := trackedProjectDir(t)
-	otherDir := trackedProjectDir(t)
-	compose := "docker-compose.yaml"
-	workspace := Workspace{
-		Projects: map[string]projects.Project{
-			"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
-			"billing": {Alias: "billing", Dir: otherDir, Compose: &compose},
-		},
-	}
-	composeSpy := &composeSpy{running: map[string]bool{otherDir: true}}
-
-	result, err := workspace.UpProject(context.Background(), targetDir, "", false, false, composeSpy)
-	if err != nil {
-		t.Fatalf("up project: %v", err)
-	}
-
-	if result.Alias != "orders" {
-		t.Fatalf("unexpected target: %s", result.Alias)
-	}
-	if !slices.Equal(result.Stopped, []string{"billing"}) {
-		t.Fatalf("unexpected stopped projects: %v", result.Stopped)
-	}
-	expectedCalls := []composeCall{
-		{Action: "ps", Target: containers.Target{Alias: "billing", Dir: otherDir, File: compose}},
-		{Action: "down", Target: containers.Target{Alias: "billing", Dir: otherDir, File: compose}},
-		{Action: "up", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}},
-	}
-	if !slices.Equal(composeSpy.calls, expectedCalls) {
-		t.Fatalf("unexpected calls: %v", composeSpy.calls)
-	}
-}
-
-func TestUpProjectAlongsideKeepsOtherRunningCompose(t *testing.T) {
-	targetDir := trackedProjectDir(t)
-	otherDir := trackedProjectDir(t)
-	compose := "docker-compose.yaml"
-	workspace := Workspace{
-		Projects: map[string]projects.Project{
-			"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
-			"billing": {Alias: "billing", Dir: otherDir, Compose: &compose},
-		},
-	}
-	composeSpy := &composeSpy{running: map[string]bool{otherDir: true}}
-
-	result, err := workspace.UpProject(context.Background(), targetDir, "", true, false, composeSpy)
-	if err != nil {
-		t.Fatalf("up project: %v", err)
-	}
-
-	if len(result.Stopped) != 0 {
-		t.Fatalf("unexpected stopped projects: %v", result.Stopped)
-	}
-	expectedCalls := []composeCall{{Action: "up", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}}}
-	if !slices.Equal(composeSpy.calls, expectedCalls) {
-		t.Fatalf("unexpected calls: %v", composeSpy.calls)
-	}
-}
-
-func TestUpProjectFailsWhenComposeMissing(t *testing.T) {
-	dir := t.TempDir()
-	workspace := Workspace{
-		Projects: map[string]projects.Project{
-			"orders": {Alias: "orders", Dir: dir},
-		},
-	}
-
-	composeSpy := &composeSpy{}
-	_, err := workspace.UpProject(context.Background(), dir, "", false, false, composeSpy)
-	if err == nil {
-		t.Fatal("expected compose error")
-	}
-	if !strings.Contains(err.Error(), "no docker compose configured for project orders") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(composeSpy.calls) != 0 {
-		t.Fatalf("unexpected calls: %v", composeSpy.calls)
-	}
-}
-
-func TestUpProjectBlankCleansTargetVolumesBeforeStart(t *testing.T) {
-	targetDir := trackedProjectDir(t)
-	otherDir := trackedProjectDir(t)
-	compose := "docker-compose.yaml"
-	workspace := Workspace{
-		Projects: map[string]projects.Project{
-			"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
-			"billing": {Alias: "billing", Dir: otherDir, Compose: &compose},
-		},
-	}
-	composeSpy := &composeSpy{running: map[string]bool{otherDir: true}}
-
-	result, err := workspace.UpProject(context.Background(), targetDir, "", false, true, composeSpy)
-	if err != nil {
-		t.Fatalf("up project: %v", err)
-	}
-
-	if !result.Blank {
-		t.Fatal("expected blank result")
-	}
-	expectedCalls := []composeCall{
-		{Action: "ps", Target: containers.Target{Alias: "billing", Dir: otherDir, File: compose}},
-		{Action: "down", Target: containers.Target{Alias: "billing", Dir: otherDir, File: compose}},
-		{Action: "cleanup", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}},
-		{Action: "up", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}},
-	}
-	if !slices.Equal(composeSpy.calls, expectedCalls) {
-		t.Fatalf("unexpected calls: %v", composeSpy.calls)
-	}
-}
-
-func TestUpProjectBlankAlongsideSkipsOtherProjects(t *testing.T) {
-	targetDir := trackedProjectDir(t)
-	otherDir := trackedProjectDir(t)
-	compose := "docker-compose.yaml"
-	workspace := Workspace{
-		Projects: map[string]projects.Project{
-			"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
-			"billing": {Alias: "billing", Dir: otherDir, Compose: &compose},
-		},
-	}
-	composeSpy := &composeSpy{running: map[string]bool{otherDir: true}}
-
-	result, err := workspace.UpProject(context.Background(), targetDir, "", true, true, composeSpy)
-	if err != nil {
-		t.Fatalf("up project: %v", err)
-	}
-
-	if !result.Blank {
-		t.Fatal("expected blank result")
-	}
-	expectedCalls := []composeCall{
-		{Action: "cleanup", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}},
-		{Action: "up", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}},
-	}
-	if !slices.Equal(composeSpy.calls, expectedCalls) {
-		t.Fatalf("unexpected calls: %v", composeSpy.calls)
-	}
-}
-
-func TestUpProjectProcessesOtherProjectsInAliasOrder(t *testing.T) {
+func TestUpProjectExecutesPlannedMutatingActions(t *testing.T) {
 	targetDir := trackedProjectDir(t)
 	apiDir := trackedProjectDir(t)
-	databaseDir := trackedProjectDir(t)
-	workerDir := trackedProjectDir(t)
+	billingDir := trackedProjectDir(t)
 	compose := "docker-compose.yaml"
 	workspace := Workspace{Projects: map[string]projects.Project{
-		"worker":   {Alias: "worker", Dir: workerDir, Compose: &compose},
-		"orders":   {Alias: "orders", Dir: targetDir, Compose: &compose},
-		"database": {Alias: "database", Dir: databaseDir, Compose: &compose},
-		"api":      {Alias: "api", Dir: apiDir, Compose: &compose},
+		"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
+		"api":     {Alias: "api", Dir: apiDir, Compose: &compose},
+		"billing": {Alias: "billing", Dir: billingDir, Compose: &compose},
 	}}
-	spy := &composeSpy{running: map[string]bool{
-		apiDir:      true,
-		databaseDir: true,
-		workerDir:   true,
-	}}
+	spy := &composeSpy{running: map[string]bool{apiDir: true, billingDir: true}}
 
 	result, err := workspace.UpProject(t.Context(), targetDir, "", false, false, spy)
 	if err != nil {
 		t.Fatalf("up project: %v", err)
 	}
-
-	if !slices.Equal(result.Stopped, []string{"api", "database", "worker"}) {
-		t.Fatalf("unexpected stopped order: %v", result.Stopped)
+	if result.Alias != "orders" || !slices.Equal(result.Stopped, []string{"api", "billing"}) {
+		t.Fatalf("unexpected result: %+v", result)
 	}
+
 	expected := []composeCall{
 		{Action: "ps", Target: containers.Target{Alias: "api", Dir: apiDir, File: compose}},
+		{Action: "ps", Target: containers.Target{Alias: "billing", Dir: billingDir, File: compose}},
 		{Action: "down", Target: containers.Target{Alias: "api", Dir: apiDir, File: compose}},
-		{Action: "ps", Target: containers.Target{Alias: "database", Dir: databaseDir, File: compose}},
-		{Action: "down", Target: containers.Target{Alias: "database", Dir: databaseDir, File: compose}},
-		{Action: "ps", Target: containers.Target{Alias: "worker", Dir: workerDir, File: compose}},
-		{Action: "down", Target: containers.Target{Alias: "worker", Dir: workerDir, File: compose}},
+		{Action: "down", Target: containers.Target{Alias: "billing", Dir: billingDir, File: compose}},
 		{Action: "up", Target: containers.Target{Alias: "orders", Dir: targetDir, File: compose}},
 	}
 	if !slices.Equal(spy.calls, expected) {
@@ -269,19 +121,17 @@ func TestUpProjectProcessesOtherProjectsInAliasOrder(t *testing.T) {
 func TestUpProjectStopsAfterFirstActionFailure(t *testing.T) {
 	targetDir := trackedProjectDir(t)
 	apiDir := trackedProjectDir(t)
-	databaseDir := trackedProjectDir(t)
-	workerDir := trackedProjectDir(t)
+	billingDir := trackedProjectDir(t)
 	compose := "docker-compose.yaml"
-	workspace := Workspace{Projects: map[string]projects.Project{
-		"worker":   {Alias: "worker", Dir: workerDir, Compose: &compose},
-		"orders":   {Alias: "orders", Dir: targetDir, Compose: &compose},
-		"database": {Alias: "database", Dir: databaseDir, Compose: &compose},
-		"api":      {Alias: "api", Dir: apiDir, Compose: &compose},
-	}}
 	actionErr := errors.New("down failed")
+	workspace := Workspace{Projects: map[string]projects.Project{
+		"orders":  {Alias: "orders", Dir: targetDir, Compose: &compose},
+		"api":     {Alias: "api", Dir: apiDir, Compose: &compose},
+		"billing": {Alias: "billing", Dir: billingDir, Compose: &compose},
+	}}
 	spy := &composeSpy{
-		running: map[string]bool{apiDir: true, databaseDir: true, workerDir: true},
-		fail:    map[string]error{"down:database": actionErr},
+		running: map[string]bool{apiDir: true, billingDir: true},
+		fail:    map[string]error{"down:api": actionErr},
 	}
 
 	_, err := workspace.UpProject(t.Context(), targetDir, "", false, false, spy)
@@ -290,49 +140,52 @@ func TestUpProjectStopsAfterFirstActionFailure(t *testing.T) {
 	}
 	expected := []composeCall{
 		{Action: "ps", Target: containers.Target{Alias: "api", Dir: apiDir, File: compose}},
+		{Action: "ps", Target: containers.Target{Alias: "billing", Dir: billingDir, File: compose}},
 		{Action: "down", Target: containers.Target{Alias: "api", Dir: apiDir, File: compose}},
-		{Action: "ps", Target: containers.Target{Alias: "database", Dir: databaseDir, File: compose}},
-		{Action: "down", Target: containers.Target{Alias: "database", Dir: databaseDir, File: compose}},
 	}
 	if !slices.Equal(spy.calls, expected) {
 		t.Fatalf("unexpected calls after failure: %v", spy.calls)
 	}
 }
 
-func TestDownProjectSelectsOneAction(t *testing.T) {
-	tests := []struct {
-		name   string
-		blank  bool
-		action string
-	}{
-		{name: "default", action: "down"},
-		{name: "blank", blank: true, action: "cleanup"},
+func TestUpProjectFailsWhenComposeFileMissingBeforePlan(t *testing.T) {
+	dir := t.TempDir()
+	compose := "docker-compose.yaml"
+	workspace := Workspace{Projects: map[string]projects.Project{
+		"orders": {Alias: "orders", Dir: dir, Compose: &compose},
+	}}
+	spy := &composeSpy{}
+
+	_, err := workspace.UpProject(t.Context(), dir, "", false, false, spy)
+	if err == nil || !strings.Contains(err.Error(), "no docker compose configured for project orders") {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	if len(spy.calls) != 0 {
+		t.Fatalf("plan ran before missing-file gate: %v", spy.calls)
+	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := trackedProjectDir(t)
-			compose := "docker-compose.yaml"
-			workspace := Workspace{Projects: map[string]projects.Project{
-				"orders": {Alias: "orders", Dir: dir, Compose: &compose},
-			}}
-			spy := &composeSpy{}
+func TestDownProjectExecutesPlannedAction(t *testing.T) {
+	dir := trackedProjectDir(t)
+	compose := "docker-compose.yaml"
+	workspace := Workspace{Projects: map[string]projects.Project{
+		"orders": {Alias: "orders", Dir: dir, Compose: &compose},
+	}}
+	spy := &composeSpy{}
 
-			project, err := workspace.DownProject(t.Context(), t.TempDir(), "orders", tt.blank, spy)
-			if err != nil {
-				t.Fatalf("down project: %v", err)
-			}
-			if project.Alias != "orders" {
-				t.Fatalf("unexpected project: %s", project.Alias)
-			}
-			expected := []composeCall{{
-				Action: tt.action,
-				Target: containers.Target{Alias: "orders", Dir: dir, File: compose},
-			}}
-			if !slices.Equal(spy.calls, expected) {
-				t.Fatalf("unexpected calls: %v", spy.calls)
-			}
-		})
+	project, err := workspace.DownProject(t.Context(), t.TempDir(), "orders", false, spy)
+	if err != nil {
+		t.Fatalf("down project: %v", err)
+	}
+	if project.Alias != "orders" {
+		t.Fatalf("unexpected project: %s", project.Alias)
+	}
+	expected := []composeCall{{
+		Action: "down",
+		Target: containers.Target{Alias: "orders", Dir: dir, File: compose},
+	}}
+	if !slices.Equal(spy.calls, expected) {
+		t.Fatalf("unexpected calls: %v", spy.calls)
 	}
 }
 
@@ -351,9 +204,10 @@ func TestDownProjectRejectsMissingTargetBeforeComposeAction(t *testing.T) {
 
 func TestDownProjectRejectsMissingComposeBeforeAction(t *testing.T) {
 	dir := t.TempDir()
+	compose := "docker-compose.yaml"
 	spy := &composeSpy{}
 	workspace := Workspace{Projects: map[string]projects.Project{
-		"orders": {Alias: "orders", Dir: dir},
+		"orders": {Alias: "orders", Dir: dir, Compose: &compose},
 	}}
 
 	_, err := workspace.DownProject(t.Context(), dir, "", false, spy)

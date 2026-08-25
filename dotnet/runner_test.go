@@ -26,9 +26,8 @@ func TestTestRunnerStreamsAndLogsFilteredDotnetTest(t *testing.T) {
 	summary := TestSummary{Total: 4, Passed: 2, Failed: 1, Skipped: 1}
 	var stdout, stderr bytes.Buffer
 	commandRunner := &SpyCommandRunner{
-		Summary: &summary,
-		Stdout:  "live stdout\n",
-		Stderr:  "live stderr\n",
+		Stdout: "live stdout\n",
+		Stderr: "live stderr\n",
 	}
 	commandRunner.BeforeReturn = func(Command) {
 		if stdout.String() != "live stdout\n" {
@@ -38,7 +37,7 @@ func TestTestRunnerStreamsAndLogsFilteredDotnetTest(t *testing.T) {
 			t.Fatalf("stderr was not visible before process completion: %q", stderr.String())
 		}
 	}
-	testRunner := NewTestRunner(commandRunner, &stdout, &stderr, false)
+	testRunner := makeTestRunner(commandRunner, &stdout, &stderr, newPlainPresentation, staticSummary(summary, nil))
 
 	err = testRunner.Run(t.Context(), dir, run, projects.UnitTestKind, projects.TestTarget{
 		Project: "tests/Orders.UnitTests/Orders.UnitTests.csproj",
@@ -53,12 +52,7 @@ func TestTestRunnerStreamsAndLogsFilteredDotnetTest(t *testing.T) {
 	}
 	execution := commandRunner.Executions[0]
 	resultsDir := filepath.Join(run.Root, "unit", "results")
-	wantArgs := []string{
-		"test",
-		"--logger", "trx;LogFilePrefix=unit",
-		"--results-directory", resultsDir,
-		"--filter", "FullyQualifiedName~UnitTests",
-	}
+	wantArgs := TestArgs(projects.UnitTestKind, "FullyQualifiedName~UnitTests", resultsDir)
 	if strings.Join(execution.Args, "\x00") != strings.Join(wantArgs, "\x00") {
 		t.Fatalf("unexpected args: got %q want %q", execution.Args, wantArgs)
 	}
@@ -94,9 +88,9 @@ func TestTestRunnerReportsBeforeReturningCommandFailure(t *testing.T) {
 	}
 	failed := errors.New("command failed")
 	summary := TestSummary{Total: 2, Passed: 1, Failed: 1}
-	commandRunner := &SpyCommandRunner{Summary: &summary, Err: failed, Stderr: "failure detail\n"}
+	commandRunner := &SpyCommandRunner{Err: failed, Stderr: "failure detail\n"}
 	var diagnostics bytes.Buffer
-	runner := NewTestRunner(commandRunner, io.Discard, &diagnostics, false)
+	runner := makeTestRunner(commandRunner, io.Discard, &diagnostics, newPlainPresentation, staticSummary(summary, nil))
 
 	err = runner.Run(t.Context(), dir, run, projects.UnitTestKind, projects.TestTarget{})
 
@@ -123,7 +117,8 @@ func TestTestRunnerReportsUnavailableSummaryAndLogPath(t *testing.T) {
 		t.Fatalf("create test run: %v", err)
 	}
 	var diagnostics bytes.Buffer
-	runner := NewTestRunner(&SpyCommandRunner{}, io.Discard, &diagnostics, false)
+	missing := errors.New("no TRX result files found")
+	runner := makeTestRunner(&SpyCommandRunner{}, io.Discard, &diagnostics, newPlainPresentation, staticSummary(TestSummary{}, missing))
 
 	err = runner.Run(t.Context(), dir, run, projects.ComponentTestKind, projects.TestTarget{})
 
@@ -145,7 +140,7 @@ func TestTestRunnerDoesNotExecuteWhenLogSetupFails(t *testing.T) {
 		t.Fatalf("create root file: %v", err)
 	}
 	commandRunner := &SpyCommandRunner{}
-	runner := NewTestRunner(commandRunner, io.Discard, io.Discard, false)
+	runner := makeTestRunner(commandRunner, io.Discard, io.Discard, newPlainPresentation, staticSummary(TestSummary{}, nil))
 
 	err := runner.Run(t.Context(), t.TempDir(), TestRun{Root: rootFile}, projects.UnitTestKind, projects.TestTarget{})
 
@@ -164,7 +159,7 @@ func TestTestRunnerPropagatesDiagnosticWriteFailure(t *testing.T) {
 	}
 	rejected := errors.New("diagnostic write rejected")
 	commandRunner := &SpyCommandRunner{}
-	runner := NewTestRunner(commandRunner, io.Discard, &rejectingWriter{err: rejected}, false)
+	runner := makeTestRunner(commandRunner, io.Discard, &rejectingWriter{err: rejected}, newPlainPresentation, staticSummary(TestSummary{}, nil))
 
 	err = runner.Run(t.Context(), t.TempDir(), run, projects.UnitTestKind, projects.TestTarget{})
 
@@ -184,12 +179,11 @@ func TestTestRunnerCollapsesTransientOutputBeforeReporting(t *testing.T) {
 	}
 	summary := TestSummary{Total: 2, Passed: 2}
 	commandRunner := &SpyCommandRunner{
-		Summary: &summary,
-		Stdout:  "live stdout\n",
-		Stderr:  "live stderr\n",
+		Stdout: "live stdout\n",
+		Stderr: "live stderr\n",
 	}
 	var terminal bytes.Buffer
-	runner := NewTestRunner(commandRunner, &terminal, &terminal, true)
+	runner := makeTestRunner(commandRunner, &terminal, &terminal, newAlternateScreenPresentation, staticSummary(summary, nil))
 
 	err = runner.Run(t.Context(), dir, run, projects.UnitTestKind, projects.TestTarget{})
 
@@ -222,7 +216,7 @@ func TestTestRunnerDoesNotExecuteWhenPresentationEntryFails(t *testing.T) {
 	}
 	rejected := errors.New("presentation rejected")
 	commandRunner := &SpyCommandRunner{}
-	runner := NewTestRunner(commandRunner, io.Discard, &rejectingWriter{err: rejected}, true)
+	runner := makeTestRunner(commandRunner, io.Discard, &rejectingWriter{err: rejected}, newAlternateScreenPresentation, staticSummary(TestSummary{}, nil))
 
 	err = runner.Run(t.Context(), t.TempDir(), run, projects.UnitTestKind, projects.TestTarget{})
 
@@ -242,12 +236,14 @@ func TestTestRunnerReportsAfterRestorationFailure(t *testing.T) {
 	restoreErr := errors.New("restore failed")
 	var terminal bytes.Buffer
 	presentation := &recordingPresentation{output: &terminal, endErr: restoreErr}
-	commandRunner := &SpyCommandRunner{
-		Summary: &TestSummary{Total: 1, Passed: 1},
-		Stdout:  "raw output\n",
-	}
-	runner := NewTestRunner(commandRunner, &terminal, &terminal, false)
-	runner.newPresentation = func(io.Writer) categoryPresentation { return presentation }
+	commandRunner := &SpyCommandRunner{Stdout: "raw output\n"}
+	runner := makeTestRunner(
+		commandRunner,
+		&terminal,
+		&terminal,
+		func(io.Writer) categoryPresentation { return presentation },
+		staticSummary(TestSummary{Total: 1, Passed: 1}, nil),
+	)
 
 	err = runner.Run(t.Context(), t.TempDir(), run, projects.UnitTestKind, projects.TestTarget{})
 
@@ -271,7 +267,13 @@ func TestTestRunnerRestoresCanceledCategoryAndRetainsLog(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	var terminal bytes.Buffer
-	runner := NewTestRunner(cancelingCommandRunner{}, &terminal, &terminal, true)
+	runner := makeTestRunner(
+		cancelingCommandRunner{},
+		&terminal,
+		&terminal,
+		newAlternateScreenPresentation,
+		staticSummary(TestSummary{}, errors.New("canceled")),
+	)
 
 	err = runner.Run(ctx, t.TempDir(), run, projects.ComponentTestKind, projects.TestTarget{})
 
@@ -297,8 +299,8 @@ func TestTestRunnerUsesSeparateTransientLifecyclePerCategory(t *testing.T) {
 		t.Fatalf("create test run: %v", err)
 	}
 	var terminal bytes.Buffer
-	commandRunner := &SpyCommandRunner{Summary: &TestSummary{Total: 1, Passed: 1}}
-	runner := NewTestRunner(commandRunner, &terminal, &terminal, true)
+	commandRunner := &SpyCommandRunner{}
+	runner := makeTestRunner(commandRunner, &terminal, &terminal, newAlternateScreenPresentation, staticSummary(TestSummary{Total: 1, Passed: 1}, nil))
 
 	for _, kind := range []projects.TestKind{projects.UnitTestKind, projects.IntegrationTestKind} {
 		if err := runner.Run(t.Context(), t.TempDir(), run, kind, projects.TestTarget{}); err != nil {
@@ -316,6 +318,12 @@ func TestTestRunnerUsesSeparateTransientLifecyclePerCategory(t *testing.T) {
 	secondEnter := firstEnter + len(ansi.SetModeAltScreenSaveCursor) + secondEnterOffset
 	if firstEnter < 0 || secondEnterOffset < 0 || strings.Index(output, "unit summary:") > secondEnter {
 		t.Fatalf("unit report did not precede the next category: %q", output)
+	}
+}
+
+func staticSummary(summary TestSummary, err error) summaryLoader {
+	return func(string) (TestSummary, error) {
+		return summary, err
 	}
 }
 
@@ -349,7 +357,6 @@ func (cancelingCommandRunner) Exec(ctx context.Context, command Command) error {
 
 type SpyCommandRunner struct {
 	Executions   []Command
-	Summary      *TestSummary
 	Stdout       string
 	Stderr       string
 	Err          error
@@ -364,38 +371,10 @@ func (runner *SpyCommandRunner) Exec(_ context.Context, command Command) error {
 	if runner.Stderr != "" {
 		_, _ = io.WriteString(command.Error, runner.Stderr)
 	}
-	if runner.Summary != nil {
-		resultsDir := argumentValue(command.Args, "--results-directory")
-		writeTRXFile(resultsDir, *runner.Summary)
-	}
 	if runner.BeforeReturn != nil {
 		runner.BeforeReturn(command)
 	}
 	return runner.Err
-}
-
-func argumentValue(args []string, name string) string {
-	for index := 0; index+1 < len(args); index++ {
-		if args[index] == name {
-			return args[index+1]
-		}
-	}
-	return ""
-}
-
-func writeTRXFile(resultsDir string, summary TestSummary) {
-	if resultsDir == "" {
-		return
-	}
-	_ = os.MkdirAll(resultsDir, 0o755)
-	contents := fmt.Sprintf(
-		`<TestRun><ResultSummary><Counters total="%d" passed="%d" failed="%d" notExecuted="%d"/></ResultSummary></TestRun>`,
-		summary.Total,
-		summary.Passed,
-		summary.Failed,
-		summary.Skipped,
-	)
-	_ = os.WriteFile(filepath.Join(resultsDir, "result.trx"), []byte(contents), 0o600)
 }
 
 func TestStdCommandRunnerPassesConfiguredStreams(t *testing.T) {
